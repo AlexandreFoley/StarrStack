@@ -29,6 +29,10 @@ RUN rm -rf /opt/Sonarr/Sonarr.Update
 RUN rm -rf /opt/Radarr/Radarr.Update
 RUN echo -e "UpdateMethod=External\nUpdateMethodMessage=Update managed by container builder\nBranch=master\n" >> /opt/package_info
 
+# Deduplicate identical files across /opt directories
+COPY deduplicate.sh /deduplicate.sh
+RUN bash /deduplicate.sh
+
 # Final stage - minimal image with only what's needed
 FROM registry.access.redhat.com/ubi9/ubi-init
 
