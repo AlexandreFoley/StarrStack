@@ -44,10 +44,10 @@ RUN useradd --system --no-create-home --gid unpackerr unpackerr
 
 # Copy only the installed applications and configs from builder
 COPY --from=builder /opt /opt
-COPY --from=builder /configs /configs
 COPY --from=builder /usr/bin/unpackerr /usr/bin/unpackerr
 COPY --from=builder /etc/systemd/system /etc/systemd/system
 COPY --from=builder /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
+COPY unpackerr.conf /opt/unpackerr.conf
 
 # Install runtime dependencies and cleanup
 RUN dnf install -y --nodocs libicu sqlite && \
@@ -55,6 +55,32 @@ RUN dnf install -y --nodocs libicu sqlite && \
     rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
 
 RUN systemctl enable sonarr radarr prowlarr unpackerr
+
+VOLUME ["/config","/media"]
+
+EXPOSE 7878 8989 9696
+
+# Environment variables for arr services
+ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
+    RADARR__AUTH__ENABLED="false" \
+    RADARR__SERVER__URLBASE="" \
+    RADARR__SERVER__PORT="7878" \
+    RADARR__AUTH__METHOD="External" \
+    SONARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
+    SONARR__AUTH__ENABLED="false" \
+    SONARR__SERVER__URLBASE="" \
+    SONARR__SERVER__PORT="8989" \
+    SONARR__AUTH__METHOD="External" \
+    PROWLARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
+    PROWLARR__AUTH__ENABLED="false" \
+    PROWLARR__SERVER__URLBASE="" \
+    PROWLARR__AUTH__METHOD="External"
+
+# Environment variables for Unpackerr - keep in sync with arr services
+ENV UN_RADARR_0_API_KEY="${RADARR__AUTH__APIKEY}" \
+    UN_RADARR_0_URL="http://127.0.0.1:${RADARR__SERVER__PORT}${RADARR__SERVER__URLBASE}" \
+    UN_SONARR_0_API_KEY="${SONARR__AUTH__APIKEY}" \
+    UN_SONARR_0_URL="http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
 
 CMD ["/sbin/init"]
 

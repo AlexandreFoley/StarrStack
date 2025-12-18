@@ -74,7 +74,7 @@ esac
 # Constants
 installdir="/opt"
 bindir="${installdir}/${app^}"
-datadir="/configs/$app/"
+datadir="/config/$app/"
 app_bin=${app^}
 
 # Create User / Group as needed
