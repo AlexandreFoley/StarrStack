@@ -38,45 +38,12 @@ fix_service_config() {
     find "$config_path" -type f -exec chmod 600 {} \; 2>/dev/null || true
 }
 
-# Function to create environment file for a service
-create_service_env_file() {
-    local service_name="$1"
-    local env_file="/etc/systemd/system/${service_name}.service.d/environment.conf"
-    local env_dir="/etc/systemd/system/${service_name}.service.d"
-    
-    # Create drop-in directory
-    mkdir -p "$env_dir"
-    
-    # Create environment file with all current environment variables
-    cat > "$env_file" <<EOF
-[Service]
-EOF
-    
-    # Export all environment variables to the service
-    env | grep -E '^[A-Z_]+=' | while read -r line; do
-        # Escape quotes and backslashes
-        key="${line%%=*}"
-        value="${line#*=}"
-        value="${value//\\/\\\\}"
-        value="${value//\"/\\\"}"
-        echo "Environment=\"$key=$value\"" >> "$env_file"
-    done
-    
-    chmod 644 "$env_file"
-}
 
 # Fix each service's config directory
 fix_service_config "radarr" "$RADARR_UID" "$RADARR_GID"
 fix_service_config "sonarr" "$SONARR_UID" "$SONARR_GID"
 fix_service_config "prowlarr" "$PROWLARR_UID" "$PROWLARR_GID"
 fix_service_config "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
-
-# Create environment files for each service
-echo "Creating environment files for services..."
-create_service_env_file "radarr"
-create_service_env_file "sonarr"
-create_service_env_file "prowlarr"
-create_service_env_file "unpackerr"
 
 # /media - world readable/writable for all services
 chmod 777 /media
