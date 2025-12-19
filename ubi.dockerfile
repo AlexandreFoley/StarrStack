@@ -49,12 +49,24 @@ COPY --from=builder /etc/systemd/system /etc/systemd/system
 COPY --from=builder /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
 COPY unpackerr.conf /opt/unpackerr.conf
 
+# Copy permission fix script and service
+COPY initialize.sh /usr/local/bin/initialize.sh
+COPY initialize.service /etc/systemd/system/initialize.service
+RUN chmod +x /usr/local/bin/initialize.sh
+
+# Override Unpackerr service with PassEnvironment directives
+RUN mkdir -p /etc/systemd/system/unpackerr.service.d && \
+    cat > /etc/systemd/system/unpackerr.service.d/override.conf <<'EOF'
+[Service]
+PassEnvironment=UN_RADARR_0_API_KEY UN_RADARR_0_URL UN_SONARR_0_API_KEY UN_SONARR_0_URL UN_DEBUG UN_LOG_FILE UN_LOG_LEVEL UN_CHECK_RESTART UN_CHECK_UPDATE UN_START_DELAY UN_STOP_TIMEOUT
+EOF
+
 # Install runtime dependencies and cleanup
 RUN dnf install -y --nodocs libicu sqlite && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
 
-RUN systemctl enable sonarr radarr prowlarr unpackerr
+RUN systemctl enable sonarr radarr prowlarr unpackerr initialize
 
 VOLUME ["/config","/media"]
 

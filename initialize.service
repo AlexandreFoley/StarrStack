@@ -1,0 +1,16 @@
+[Unit]
+Description=Initialize container: permissions and environment setup
+Before=radarr.service sonarr.service prowlarr.service unpackerr.service
+Wants=radarr.service sonarr.service prowlarr.service unpackerr.service
+DefaultDependencies=no
+After=systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/initialize.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

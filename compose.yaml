@@ -1,0 +1,46 @@
+
+services:
+  starr:
+    image: ubi:latest
+    container_name: starr
+    restart: unless-stopped
+    
+    # Port mappings
+    ports:
+      - "7878:7878"  # Radarr
+      - "8989:8989"  # Sonarr
+      - "9696:9696"  # Prowlarr
+    
+    # Volume mounts - named volumes for persistence
+    volumes:
+      - config:/config:rw
+      - media:/media:rw
+    
+    
+    # Environment variables
+    environment:
+      # Radarr
+      RADARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      RADARR__AUTH__ENABLED: "false"
+      RADARR__SERVER__URLBASE: ""
+      RADARR__SERVER__PORT: "7878"
+      RADARR__AUTH__METHOD: "External"
+      
+      # Sonarr
+      SONARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      SONARR__AUTH__ENABLED: "false"
+      SONARR__SERVER__URLBASE: ""
+      SONARR__SERVER__PORT: "8989"
+      SONARR__AUTH__METHOD: "External"
+      
+      # Prowlarr
+      PROWLARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      PROWLARR__AUTH__ENABLED: "false"
+      PROWLARR__SERVER__URLBASE: ""
+      PROWLARR__AUTH__METHOD: "External"
+
+volumes:
+  config:
+    driver: local
+  media:
+    driver: local
