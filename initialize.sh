@@ -26,7 +26,7 @@ UNPACKERR_UID=$(id -u unpackerr 2>/dev/null || echo 103)
 UNPACKERR_GID=$(id -g unpackerr 2>/dev/null || echo 103)
 
 # Function to fix permissions for a service config directory
-fix_service_config() {
+fix_mount_permissions() {
     local service_name="$1"
     local uid="$2"
     local gid="$3"
@@ -40,10 +40,10 @@ fix_service_config() {
 
 
 # Fix each service's config directory
-fix_service_config "radarr" "$RADARR_UID" "$RADARR_GID"
-fix_service_config "sonarr" "$SONARR_UID" "$SONARR_GID"
-fix_service_config "prowlarr" "$PROWLARR_UID" "$PROWLARR_GID"
-fix_service_config "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
+fix_mount_permissions "radarr" "$RADARR_UID" "$RADARR_GID"
+fix_mount_permissions "sonarr" "$SONARR_UID" "$SONARR_GID"
+fix_mount_permissions "prowlarr" "$PROWLARR_UID" "$PROWLARR_GID"
+fix_mount_permissions "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
 
 # /media - world readable/writable for all services
 chmod 777 /media
