@@ -47,10 +47,12 @@ RUN yes | bash repo.sh unpackerr
 FROM builder-base as consolidator
 # Copy all services from their respective builders
 COPY --from=radarr-builder /opt/Radarr /opt/Radarr
+COPY --from=radarr-builder /etc/systemd/system/radarr.service /etc/systemd/system/radarr.service
 COPY --from=sonarr-builder /opt/Sonarr /opt/Sonarr
+COPY --from=sonarr-builder /etc/systemd/system/sonarr.service /etc/systemd/system/sonarr.service
 COPY --from=prowlarr-builder /opt/Prowlarr /opt/Prowlarr
+COPY --from=prowlarr-builder /etc/systemd/system/prowlarr.service /etc/systemd/system/prowlarr.service
 COPY --from=unpackerr-builder /usr/bin/unpackerr /usr/bin/unpackerr
-COPY --from=unpackerr-builder /etc/systemd/system /etc/systemd/system
 COPY --from=unpackerr-builder /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
 
 # Add update method info
@@ -98,6 +100,7 @@ COPY unpackerr.conf /opt/unpackerr.conf
 # Copy permission fix script and service
 COPY initialize.sh /usr/local/bin/initialize.sh
 COPY initialize.service /etc/systemd/system/initialize.service
+COPY logging.service /etc/systemd/system/logging.service
 RUN chmod +x /usr/local/bin/initialize.sh
 
 # Override Unpackerr service with PassEnvironment directives
@@ -112,7 +115,7 @@ RUN dnf install -y --nodocs libicu sqlite && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
 
-RUN systemctl enable sonarr radarr prowlarr unpackerr initialize
+RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging
 
 VOLUME ["/config","/media"]
 
@@ -140,5 +143,8 @@ ENV UN_RADARR_0_API_KEY="${RADARR__AUTH__APIKEY}" \
     UN_SONARR_0_API_KEY="${SONARR__AUTH__APIKEY}" \
     UN_SONARR_0_URL="http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
 
+# Configure systemd to not redirect stdout/stderr to /dev/null
+# This allows systemd and service messages to be captured by podman logs
 CMD ["/sbin/init"]
+
 

@@ -8,8 +8,8 @@ Type=simple
 ExecStart=/usr/bin/journalctl -u radarr -u sonarr -u prowlarr -u unpackerr -f
 Restart=on-failure
 RestartSec=5s
-StandardOutput=journal
-StandardError=journal
+StandardOutput=file:/dev/console
+StandardError=file:/dev/console
 
 [Install]
 WantedBy=multi-user.target

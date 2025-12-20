@@ -4,6 +4,8 @@ services:
     image: ubi:latest
     container_name: starr
     restart: unless-stopped
+    tty: true
+    stdin_open: true
     
     # Port mappings
     ports:
