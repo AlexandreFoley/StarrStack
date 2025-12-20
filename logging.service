@@ -1,0 +1,15 @@
+[Unit]
+Description=Stream systemd-journal logs to stdout for container logging
+Before=radarr.service sonarr.service prowlarr.service unpackerr.service
+Wants=radarr.service sonarr.service prowlarr.service unpackerr.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/journalctl -u radarr -u sonarr -u prowlarr -u unpackerr -f
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

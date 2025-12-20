@@ -1,0 +1,161 @@
+name: Check All Services for Updates
+
+on:
+  schedule:
+    # Check for new releases weekly on Mondays at 6 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  check-all:
+    runs-on: ubuntu-latest
+    outputs:
+      radarr-version: ${{ steps.check-radarr.outputs.latest-version }}
+      radarr-update: ${{ steps.check-radarr.outputs.needs-update }}
+      sonarr-version: ${{ steps.check-sonarr.outputs.latest-version }}
+      sonarr-update: ${{ steps.check-sonarr.outputs.needs-update }}
+      prowlarr-version: ${{ steps.check-prowlarr.outputs.latest-version }}
+      prowlarr-update: ${{ steps.check-prowlarr.outputs.needs-update }}
+      unpackerr-version: ${{ steps.check-unpackerr.outputs.latest-version }}
+      unpackerr-update: ${{ steps.check-unpackerr.outputs.needs-update }}
+      any-updates: ${{ steps.summary.outputs.any-updates }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Calculate check window
+        id: window
+        run: |
+          # Last check was 7 days ago (one week before now)
+          LAST_CHECK=$(date -u -d "7 days ago" -Iseconds)
+          echo "last-check=$LAST_CHECK" >> "$GITHUB_OUTPUT"
+          echo "Checking for updates published after: $LAST_CHECK"
+
+      - name: Check Radarr
+        id: check-radarr
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/Radarr/Radarr/releases/latest)
+          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
+          PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
+          LAST_CHECK="${{ steps.window.outputs.last-check }}"
+          
+          echo "latest-version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "published-at=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          
+          if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
+            echo "needs-update=true" >> "$GITHUB_OUTPUT"
+            echo "Radarr $LATEST (published: $PUBLISHED)"
+          else
+            echo "needs-update=false" >> "$GITHUB_OUTPUT"
+            echo "Radarr $LATEST is older than last check"
+          fi
+
+      - name: Check Sonarr
+        id: check-sonarr
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/Sonarr/Sonarr/releases/latest)
+          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
+          PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
+          LAST_CHECK="${{ steps.window.outputs.last-check }}"
+          
+          echo "latest-version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "published-at=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          
+          if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
+            echo "needs-update=true" >> "$GITHUB_OUTPUT"
+            echo "Sonarr $LATEST (published: $PUBLISHED)"
+          else
+            echo "needs-update=false" >> "$GITHUB_OUTPUT"
+            echo "Sonarr $LATEST is older than last check"
+          fi
+
+      - name: Check Prowlarr
+        id: check-prowlarr
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest)
+          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
+          PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
+          LAST_CHECK="${{ steps.window.outputs.last-check }}"
+          
+          echo "latest-version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "published-at=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          
+          if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
+            echo "needs-update=true" >> "$GITHUB_OUTPUT"
+            echo "Prowlarr $LATEST (published: $PUBLISHED)"
+          else
+            echo "needs-update=false" >> "$GITHUB_OUTPUT"
+            echo "Prowlarr $LATEST is older than last check"
+          fi
+
+      - name: Check Unpackerr
+        id: check-unpackerr
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/davidnewhall/unpackerr/releases/latest)
+          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
+          PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
+          LAST_CHECK="${{ steps.window.outputs.last-check }}"
+          
+          echo "latest-version=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "published-at=$PUBLISHED" >> "$GITHUB_OUTPUT"
+          
+          if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
+            echo "needs-update=true" >> "$GITHUB_OUTPUT"
+            echo "Unpackerr $LATEST (published: $PUBLISHED)"
+          else
+            echo "needs-update=false" >> "$GITHUB_OUTPUT"
+            echo "Unpackerr $LATEST is older than last check"
+          fi
+
+      - name: Summarize updates
+        id: summary
+        run: |
+          if [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]] || \
+             [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]] || \
+             [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]] || \
+             [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]]; then
+            echo "any-updates=true" >> "$GITHUB_OUTPUT"
+            echo "Updates available:"
+            [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]] && echo "  - Radarr: ${{ steps.check-radarr.outputs.latest-version }}"
+            [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]] && echo "  - Sonarr: ${{ steps.check-sonarr.outputs.latest-version }}"
+            [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]] && echo "  - Prowlarr: ${{ steps.check-prowlarr.outputs.latest-version }}"
+            [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]] && echo "  - Unpackerr: ${{ steps.check-unpackerr.outputs.latest-version }}"
+          else
+            echo "any-updates=false" >> "$GITHUB_OUTPUT"
+            echo "All services are up to date"
+          fi
+
+  trigger-build:
+    needs: check-all
+    if: needs.check-all.outputs.any-updates == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger build workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const inputs = {};
+            
+            if ('${{ needs.check-all.outputs.radarr-update }}' === 'true') {
+              inputs.radarr_version = '${{ needs.check-all.outputs.radarr-version }}';
+            }
+            if ('${{ needs.check-all.outputs.sonarr-update }}' === 'true') {
+              inputs.sonarr_version = '${{ needs.check-all.outputs.sonarr-version }}';
+            }
+            if ('${{ needs.check-all.outputs.prowlarr-update }}' === 'true') {
+              inputs.prowlarr_version = '${{ needs.check-all.outputs.prowlarr-version }}';
+            }
+            if ('${{ needs.check-all.outputs.unpackerr-update }}' === 'true') {
+              inputs.unpackerr_version = '${{ needs.check-all.outputs.unpackerr-version }}';
+            }
+            
+            console.log('Triggering build with inputs:', inputs);
+            
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml',
+              ref: 'main',
+              inputs: inputs
+            });
+

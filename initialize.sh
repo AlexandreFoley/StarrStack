@@ -59,3 +59,4 @@ echo "  ✓ /config/prowlarr (700) - prowlarr owned"
 echo "  ✓ /config/unpackerr (700) - unpackerr owned"
 echo "  ✓ /media permissions set (777 - world accessible)"
 echo "  ✓ Environment files created for all services"
+

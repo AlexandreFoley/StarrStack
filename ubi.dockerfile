@@ -1,40 +1,86 @@
-FROM registry.access.redhat.com/ubi9/ubi-init as builder
+# Stage 1: Base builder with common tools
+FROM registry.access.redhat.com/ubi9/ubi-init as builder-base
 
-# Install any required packages
-RUN yum update -y && \
-    yum clean all
+# Declare build arguments for version tracking
+ARG RADARR_VERSION
+ARG SONARR_VERSION
+ARG PROWLARR_VERSION
+ARG UNPACKERR_VERSION
 
+RUN dnf update -y && \
+    dnf install -y --nodocs wget libicu && \
+    dnf clean all
+COPY arrstack-install.sh /arrstack-install.sh
+
+# Stage 2: Download and build Radarr
+FROM builder-base as radarr-builder
+ARG RADARR_VERSION
+RUN echo "Building Radarr ${RADARR_VERSION}"
+RUN groupadd radarr
+RUN bash arrstack-install.sh radarr radarr radarr
+RUN rm -rf /opt/Radarr/Radarr.Update
+
+# Stage 3: Download and build Sonarr
+FROM builder-base as sonarr-builder
+ARG SONARR_VERSION
+RUN echo "Building Sonarr ${SONARR_VERSION}"
+RUN groupadd sonarr
+RUN bash arrstack-install.sh sonarr sonarr sonarr
+RUN rm -rf /opt/Sonarr/Sonarr.Update
+
+# Stage 4: Download and build Prowlarr
+FROM builder-base as prowlarr-builder
+ARG PROWLARR_VERSION
+RUN echo "Building Prowlarr ${PROWLARR_VERSION}"
+RUN groupadd prowlarr
+RUN bash arrstack-install.sh prowlarr prowlarr prowlarr
+RUN rm -rf /opt/Prowlarr/Prowlarr.Update
+
+# Stage 5: Download and build Unpackerr
+FROM builder-base as unpackerr-builder
+ARG UNPACKERR_VERSION
+RUN echo "Building Unpackerr ${UNPACKERR_VERSION}"
 COPY repo.sh repo.sh
 RUN yes | bash repo.sh unpackerr
 
-RUN groupadd sonarr
-RUN groupadd radarr
-RUN groupadd prowlarr
-RUN mkdir configs
+# Stage 6: Consolidation - combine all services and deduplicate
+FROM builder-base as consolidator
+# Copy all services from their respective builders
+COPY --from=radarr-builder /opt/Radarr /opt/Radarr
+COPY --from=sonarr-builder /opt/Sonarr /opt/Sonarr
+COPY --from=prowlarr-builder /opt/Prowlarr /opt/Prowlarr
+COPY --from=unpackerr-builder /usr/bin/unpackerr /usr/bin/unpackerr
+COPY --from=unpackerr-builder /etc/systemd/system /etc/systemd/system
+COPY --from=unpackerr-builder /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
 
-RUN dnf install -y --nodocs wget libicu
-
-COPY arrstack-install.sh /arrstack-install.sh
-RUN bash arrstack-install.sh sonarr sonarr sonarr
-RUN bash arrstack-install.sh radarr radarr radarr
-RUN bash arrstack-install.sh prowlarr prowlarr prowlarr
-# Set up a basic service (optional example)
-RUN systemctl enable sonarr radarr prowlarr unpackerr
-
-#Cleanup
-RUN dnf clean all; rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
-RUN rm *.tar.gz
-RUN rm -rf /opt/Prowlarr/Prowlarr.Update
-RUN rm -rf /opt/Sonarr/Sonarr.Update
-RUN rm -rf /opt/Radarr/Radarr.Update
+# Add update method info
 RUN echo -e "UpdateMethod=External\nUpdateMethodMessage=Update managed by container builder\nBranch=master\n" >> /opt/package_info
 
 # Deduplicate identical files across /opt directories
 COPY deduplicate.sh /deduplicate.sh
 RUN bash /deduplicate.sh
 
-# Final stage - minimal image with only what's needed
-FROM registry.access.redhat.com/ubi9/ubi-init
+# Stage 7: Final stage - minimal image with only what's needed
+FROM registry.access.redhat.com/ubi9/ubi-init as final
+
+# Declare build arguments for labels
+ARG RADARR_VERSION
+ARG SONARR_VERSION
+ARG PROWLARR_VERSION
+ARG UNPACKERR_VERSION
+
+# Add labels with service versions
+LABEL org.opencontainers.image.title="Starr Stack" \
+      org.opencontainers.image.description="Unified container with Radarr, Sonarr, Prowlarr, and Unpackerr" \
+      org.opencontainers.image.vendor="Alexandre Foley" \
+      org.opencontainers.image.source="https://github.com/AlexandreFoley/StarrStack" \
+      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      radarr.version="${RADARR_VERSION}" \
+      sonarr.version="${SONARR_VERSION}" \
+      prowlarr.version="${PROWLARR_VERSION}" \
+      unpackerr.version="${UNPACKERR_VERSION}"
 
 RUN groupadd sonarr && groupadd radarr && groupadd prowlarr && groupadd unpackerr
 RUN useradd --system --no-create-home --gid sonarr sonarr
@@ -42,11 +88,11 @@ RUN useradd --system --no-create-home --gid radarr radarr
 RUN useradd --system --no-create-home --gid prowlarr prowlarr
 RUN useradd --system --no-create-home --gid unpackerr unpackerr
 
-# Copy only the installed applications and configs from builder
-COPY --from=builder /opt /opt
-COPY --from=builder /usr/bin/unpackerr /usr/bin/unpackerr
-COPY --from=builder /etc/systemd/system /etc/systemd/system
-COPY --from=builder /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
+# Copy consolidated applications from consolidator stage
+COPY --from=consolidator /opt /opt
+COPY --from=consolidator /usr/bin/unpackerr /usr/bin/unpackerr
+COPY --from=consolidator /etc/systemd/system /etc/systemd/system
+COPY --from=consolidator /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
 COPY unpackerr.conf /opt/unpackerr.conf
 
 # Copy permission fix script and service

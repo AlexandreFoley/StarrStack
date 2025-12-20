@@ -1,0 +1,189 @@
+name: Build and Publish Container Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      push:
+        description: 'Push to registry (true/false)'
+        required: false
+        default: 'false'
+      registry:
+        description: 'Container registry (docker/ghcr)'
+        required: false
+        default: 'ghcr'
+      radarr_version:
+        description: 'Radarr version (from check workflow)'
+        required: false
+      sonarr_version:
+        description: 'Sonarr version (from check workflow)'
+        required: false
+      prowlarr_version:
+        description: 'Prowlarr version (from check workflow)'
+        required: false
+      unpackerr_version:
+        description: 'Unpackerr version (from check workflow)'
+        required: false
+  push:
+    branches:
+      - main
+    paths:
+      - 'Dockerfile'
+      - 'ubi.dockerfile'
+      - 'arrstack-install.sh'
+      - 'deduplicate.sh'
+      - 'initialize.sh'
+      - '.github/workflows/build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Fetch latest versions
+        id: versions
+        run: |
+          # Use provided inputs if available, otherwise fetch latest
+          if [ -n "${{ github.event.inputs.radarr_version }}" ]; then
+            RADARR=${{ github.event.inputs.radarr_version }}
+          else
+            RADARR=$(curl -s https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+          fi
+          
+          if [ -n "${{ github.event.inputs.sonarr_version }}" ]; then
+            SONARR=${{ github.event.inputs.sonarr_version }}
+          else
+            SONARR=$(curl -s https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+          fi
+          
+          if [ -n "${{ github.event.inputs.prowlarr_version }}" ]; then
+            PROWLARR=${{ github.event.inputs.prowlarr_version }}
+          else
+            PROWLARR=$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+          fi
+          
+          if [ -n "${{ github.event.inputs.unpackerr_version }}" ]; then
+            UNPACKERR=${{ github.event.inputs.unpackerr_version }}
+          else
+            UNPACKERR=$(curl -s https://api.github.com/repos/davidnewhall/unpackerr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+          fi
+          
+          echo "radarr=$RADARR" >> "$GITHUB_OUTPUT"
+          echo "sonarr=$SONARR" >> "$GITHUB_OUTPUT"
+          echo "prowlarr=$PROWLARR" >> "$GITHUB_OUTPUT"
+          echo "unpackerr=$UNPACKERR" >> "$GITHUB_OUTPUT"
+          
+          echo "Build versions:"
+          echo "  Radarr: $RADARR"
+          echo "  Sonarr: $SONARR"
+          echo "  Prowlarr: $PROWLARR"
+          echo "  Unpackerr: $UNPACKERR"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ubi.dockerfile
+          push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
+          load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            RADARR_VERSION=${{ steps.versions.outputs.radarr }}
+            SONARR_VERSION=${{ steps.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ steps.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ steps.versions.outputs.unpackerr }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+
+      - name: Test container locally
+        if: github.event_name != 'push' && github.event.inputs.push != 'true'
+        run: |
+          # Create test directories
+          mkdir -p /tmp/test-config /tmp/test-media
+          
+          # Run container in background
+          docker run --rm -d --name test-arrstack \
+            -p 7878:7878 \
+            -p 8989:8989 \
+            -p 9696:9696 \
+            -v /tmp/test-config:/config \
+            -v /tmp/test-media:/media \
+            ghcr.io/${{ github.repository }}:${{ github.sha }} &
+          
+          sleep 10
+          
+          # Test endpoints
+          echo "Testing Radarr..."
+          if curl -s http://localhost:7878/api/v3/system/status > /dev/null 2>&1; then
+            echo "✓ Radarr responding"
+          else
+            echo "✗ Radarr not responding"
+            docker kill test-arrstack
+            exit 1
+          fi
+          
+          echo "Testing Sonarr..."
+          if curl -s http://localhost:8989/api/v3/system/status > /dev/null 2>&1; then
+            echo "✓ Sonarr responding"
+          else
+            echo "✗ Sonarr not responding"
+            docker kill test-arrstack
+            exit 1
+          fi
+          
+          echo "Testing Prowlarr..."
+          if curl -s http://localhost:9696/api/v1/system/status > /dev/null 2>&1; then
+            echo "✓ Prowlarr responding"
+          else
+            echo "✗ Prowlarr not responding"
+            docker kill test-arrstack
+            exit 1
+          fi
+          
+          # Check container logs for errors
+          echo "Container logs:"
+          docker logs test-arrstack | head -50
+          
+          docker kill test-arrstack
+
+      - name: Create release
+        if: github.event_name == 'push'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: build-radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
+          release_name: Build - Radarr ${{ steps.versions.outputs.radarr }} / Sonarr ${{ steps.versions.outputs.sonarr }} / Prowlarr ${{ steps.versions.outputs.prowlarr }} / Unpackerr ${{ steps.versions.outputs.unpackerr }}
+          body: |
+            ## Service Versions
+            - **Radarr**: ${{ steps.versions.outputs.radarr }}
+            - **Sonarr**: ${{ steps.versions.outputs.sonarr }}
+            - **Prowlarr**: ${{ steps.versions.outputs.prowlarr }}
+            - **Unpackerr**: ${{ steps.versions.outputs.unpackerr }}
+            
+            ### Image
+            - Registry: `ghcr.io/${{ github.repository }}`
+            - Tag: `radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}`
+            - SHA: `${{ github.sha }}`
+          draft: false
+          prerelease: false
