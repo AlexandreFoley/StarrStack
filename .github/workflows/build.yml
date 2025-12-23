@@ -102,9 +102,9 @@ jobs:
           push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
           load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
           tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
@@ -128,7 +128,7 @@ jobs:
             -p 9696:9696 \
             -v /tmp/test-config:/config \
             -v /tmp/test-media:/media \
-            ghcr.io/${{ github.repository }}:${{ github.sha }} &
+            ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}:${{ github.sha }} &
           
           sleep 10
           
@@ -182,7 +182,7 @@ jobs:
             - **Unpackerr**: ${{ steps.versions.outputs.unpackerr }}
             
             ### Image
-            - Registry: `ghcr.io/${{ github.repository }}`
+            - Registry: `ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}`
             - Tag: `radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}`
             - SHA: `${{ github.sha }}`
           draft: false
