@@ -137,12 +137,6 @@ ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     PROWLARR__SERVER__URLBASE="" \
     PROWLARR__AUTH__METHOD="External"
 
-# Environment variables for Unpackerr - keep in sync with arr services
-ENV UN_RADARR_0_API_KEY="${RADARR__AUTH__APIKEY}" \
-    UN_RADARR_0_URL="http://127.0.0.1:${RADARR__SERVER__PORT}${RADARR__SERVER__URLBASE}" \
-    UN_SONARR_0_API_KEY="${SONARR__AUTH__APIKEY}" \
-    UN_SONARR_0_URL="http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
-
 # Configure systemd to not redirect stdout/stderr to /dev/null
 # This allows systemd and service messages to be captured by podman logs
 CMD ["/sbin/init"]
