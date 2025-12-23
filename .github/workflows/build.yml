@@ -69,7 +69,7 @@ jobs:
           if [ -n "${{ github.event.inputs.unpackerr_version }}" ]; then
             UNPACKERR=${{ github.event.inputs.unpackerr_version }}
           else
-            UNPACKERR=$(curl -s https://api.github.com/repos/davidnewhall/unpackerr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            UNPACKERR=$(curl -s  https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           
           echo "radarr=$RADARR" >> "$GITHUB_OUTPUT"
