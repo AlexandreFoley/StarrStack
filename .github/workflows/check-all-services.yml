@@ -91,7 +91,7 @@ jobs:
       - name: Check Unpackerr
         id: check-unpackerr
         run: |
-          RELEASE=$(curl -s https://api.github.com/repos/davidnewhall/unpackerr/releases/latest)
+          RELEASE=$(curl -s https://api.github.com/repositories/132426524/releases/latest)
           LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
           PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
           LAST_CHECK="${{ steps.window.outputs.last-check }}"
