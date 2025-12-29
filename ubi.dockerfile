@@ -123,19 +123,19 @@ EXPOSE 7878 8989 9696
 
 # Environment variables for arr services
 ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
-    RADARR__AUTH__ENABLED="false" \
+    RADARR__AUTH__ENABLED="true" \
     RADARR__SERVER__URLBASE="" \
     RADARR__SERVER__PORT="7878" \
-    RADARR__AUTH__METHOD="External" \
+    RADARR__AUTH__METHOD="Forms" \
     SONARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
-    SONARR__AUTH__ENABLED="false" \
+    SONARR__AUTH__ENABLED="true" \
     SONARR__SERVER__URLBASE="" \
     SONARR__SERVER__PORT="8989" \
-    SONARR__AUTH__METHOD="External" \
+    SONARR__AUTH__METHOD="Forms" \
     PROWLARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
-    PROWLARR__AUTH__ENABLED="false" \
+    PROWLARR__AUTH__ENABLED="true" \
     PROWLARR__SERVER__URLBASE="" \
-    PROWLARR__AUTH__METHOD="External"
+    PROWLARR__AUTH__METHOD="Forms"
 
 # Configure systemd to not redirect stdout/stderr to /dev/null
 # This allows systemd and service messages to be captured by podman logs

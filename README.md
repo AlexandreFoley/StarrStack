@@ -3,12 +3,11 @@
 A disk-space optimized Podman/Docker image containing Radarr, Sonarr, Prowlarr, and Unpackerr running under systemd. Image size: **~700MB**.
 
 ## Features
+A **Single unified container**: All 4 services run together under systemd init. This allow:
 
-- **Single unified container**: All 4 services run together under systemd init
-- **Lightweight**: Multi-stage build + file deduplication saves 53% vs original size
-- **Smart configuration**: Environment variables auto-sync across services
-- **Pre-configured**: Ready to run with sensible defaults
-- **Customizable**: Override any setting at runtime
+- **Lightweight**: Deduplication of identical files across the arr apps.
+- **Pre-configured**: Ready to run with sensible defaults. But change the API key!
+- **Auto-configured Unpackerr**:  Using the information and settings available from within the container are used to setup a basic configuration for unpackerr.
 
 ## Services Included
 
@@ -20,6 +19,23 @@ A disk-space optimized Podman/Docker image containing Radarr, Sonarr, Prowlarr, 
 | **Unpackerr** | N/A | N/A | Automatic archive extraction |
 
 ## Quick Start
+
+### Using Pre-built Image from GitHub Container Registry
+
+Pull and run the latest image:
+
+```bash
+podman pull ghcr.io/alexandrefoley/starr:latest
+
+podman run -d \
+  --name starr \
+  -p 7878:7878 \
+  -p 8989:8989 \
+  -p 9696:9696 \
+  -v config:/config \
+  -v media:/media \
+  ghcr.io/alexandrefoley/starr:latest
+```
 
 ### Building the Image
 
@@ -44,23 +60,24 @@ podman run -d \
 
 ### Environment Variables
 
-All configuration is controlled via environment variables. Changes to these variables override the defaults baked into the image.
+Basic configuration is controlled via environment variables. Changes to these variables override the defaults baked into the image.
+Advanced configuration can be done from within the individual apps.
 
 #### Authentication Settings
 
-All services use the same API key by default. Override individually if needed:
+All services use the same API key by default and have Forms authentication enabled. Override individually if needed:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `RADARR__AUTH__APIKEY` | `c59b53...` | Radarr API key (32-char hex) |
 | `SONARR__AUTH__APIKEY` | `c59b53...` | Sonarr API key (32-char hex) |
 | `PROWLARR__AUTH__APIKEY` | `c59b53...` | Prowlarr API key (32-char hex) |
-| `RADARR__AUTH__ENABLED` | `false` | Enable auth in Radarr |
-| `SONARR__AUTH__ENABLED` | `false` | Enable auth in Sonarr |
-| `PROWLARR__AUTH__ENABLED` | `false` | Enable auth in Prowlarr |
-| `RADARR__AUTH__METHOD` | `External` | Auth method (External, Forms, ApiKey) |
-| `SONARR__AUTH__METHOD` | `External` | Auth method (External, Forms, ApiKey) |
-| `PROWLARR__AUTH__METHOD` | `External` | Auth method (External, Forms, ApiKey) |
+| `RADARR__AUTH__ENABLED` | `true` | Enable auth in Radarr |
+| `SONARR__AUTH__ENABLED` | `true` | Enable auth in Sonarr |
+| `PROWLARR__AUTH__ENABLED` | `true` | Enable auth in Prowlarr |
+| `RADARR__AUTH__METHOD` | `Forms` | Auth method (External, Forms, Basic, None) |
+| `SONARR__AUTH__METHOD` | `Forms` | Auth method (External, Forms, Basic, None) |
+| `PROWLARR__AUTH__METHOD` | `Forms` | Auth method (External, Forms, Basic, None) |
 
 #### Server Settings
 
@@ -74,14 +91,7 @@ All services use the same API key by default. Override individually if needed:
 
 #### Unpackerr Settings
 
-Unpackerr automatically syncs with Radarr and Sonarr:
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `UN_RADARR_0_API_KEY` | Auto-synced | Unpackerr's Radarr API key (auto-uses RADARR__AUTH__APIKEY) |
-| `UN_RADARR_0_URL` | Auto-computed | Unpackerr's Radarr URL (auto-uses RADARR__SERVER__PORT and URLBASE) |
-| `UN_SONARR_0_API_KEY` | Auto-synced | Unpackerr's Sonarr API key (auto-uses SONARR__AUTH__APIKEY) |
-| `UN_SONARR_0_URL` | Auto-computed | Unpackerr's Sonarr URL (auto-uses SONARR__SERVER__PORT and URLBASE) |
+Unpackerr works out of the box with no configuration needed. It automatically syncs with Radarr and Sonarr settings. For advanced configuration, see the [Unpackerr documentation](https://github.com/Unpackerr/unpackerr).
 
 ### Volumes
 
