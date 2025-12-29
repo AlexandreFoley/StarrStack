@@ -5,9 +5,10 @@ Wants=radarr.service sonarr.service prowlarr.service unpackerr.service
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/journalctl -u radarr -u sonarr -u prowlarr -u unpackerr -f
+ExecStart=/usr/bin/journalctl -u radarr -u sonarr -u prowlarr -u unpackerr -u configure-indexers -u configure-downloadclients -u initialize -f
 Restart=on-failure
 RestartSec=5s
+FailureAction=exit
 StandardOutput=file:/dev/console
 StandardError=file:/dev/console
 

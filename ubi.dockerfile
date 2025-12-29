@@ -103,6 +103,13 @@ COPY initialize.service /etc/systemd/system/initialize.service
 COPY logging.service /etc/systemd/system/logging.service
 RUN chmod +x /usr/local/bin/initialize.sh
 
+# Copy configuration scripts and services
+COPY configure-indexers.sh /usr/local/bin/configure-indexers.sh
+COPY configure-indexers.service /etc/systemd/system/configure-indexers.service
+COPY configure-downloadclients.sh /usr/local/bin/configure-downloadclients.sh
+COPY configure-downloadclients.service /etc/systemd/system/configure-downloadclients.service
+RUN chmod +x /usr/local/bin/configure-indexers.sh /usr/local/bin/configure-downloadclients.sh
+
 # Override Unpackerr service with PassEnvironment directives
 RUN mkdir -p /etc/systemd/system/unpackerr.service.d && \
     cat > /etc/systemd/system/unpackerr.service.d/override.conf <<'EOF'
@@ -111,11 +118,11 @@ PassEnvironment=UN_RADARR_0_API_KEY UN_RADARR_0_URL UN_SONARR_0_API_KEY UN_SONAR
 EOF
 
 # Install runtime dependencies and cleanup
-RUN dnf install -y --nodocs libicu sqlite && \
+RUN dnf install -y --nodocs libicu sqlite jq && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
 
-RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging
+RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging configure-indexers configure-downloadclients
 
 VOLUME ["/config","/media"]
 
@@ -135,6 +142,7 @@ ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     PROWLARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     PROWLARR__AUTH__ENABLED="true" \
     PROWLARR__SERVER__URLBASE="" \
+    PROWLARR__SERVER__PORT="9696" \
     PROWLARR__AUTH__METHOD="Forms"
 
 # Configure systemd to not redirect stdout/stderr to /dev/null

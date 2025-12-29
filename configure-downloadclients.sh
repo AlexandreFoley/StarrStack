@@ -4,17 +4,36 @@
 
 set -e
 
-# Configuration - Arr apps
-RADARR_URL="${RADARR_URL:-http://localhost:7878}"
-SONARR_URL="${SONARR_URL:-http://localhost:8989}"
+# Validate required environment variables for arr apps
+if [ -z "$RADARR__SERVER__PORT" ] || [ -z "$SONARR__SERVER__PORT" ] || \
+   [ -z "$RADARR__AUTH__APIKEY" ] || [ -z "$SONARR__AUTH__APIKEY" ]; then
+    echo -e "${RED}Error: Missing required arr environment variables${NC}"
+    echo "Required variables:"
+    echo "  RADARR__SERVER__PORT (current: ${RADARR__SERVER__PORT:-NOT SET})"
+    echo "  RADARR__AUTH__APIKEY (current: ${RADARR__AUTH__APIKEY:-NOT SET})"
+    echo "  SONARR__SERVER__PORT (current: ${SONARR__SERVER__PORT:-NOT SET})"
+    echo "  SONARR__AUTH__APIKEY (current: ${SONARR__AUTH__APIKEY:-NOT SET})"
+    echo "Optional variables:"
+    echo "  RADARR__SERVER__URLBASE, SONARR__SERVER__URLBASE"
+    exit 1
+fi
 
-RADARR_API_KEY="${RADARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
-SONARR_API_KEY="${SONARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
+# Configuration - construct URLs from standard arr environment variables
+RADARR_PORT="${RADARR__SERVER__PORT}"
+RADARR_URLBASE="${RADARR__SERVER__URLBASE}"
+RADARR_URL="http://localhost:${RADARR_PORT}${RADARR_URLBASE}"
+
+SONARR_PORT="${SONARR__SERVER__PORT}"
+SONARR_URLBASE="${SONARR__SERVER__URLBASE}"
+SONARR_URL="http://localhost:${SONARR_PORT}${SONARR_URLBASE}"
+
+RADARR_API_KEY="${RADARR__AUTH__APIKEY}"
+SONARR_API_KEY="${SONARR__AUTH__APIKEY}"
 
 # Download client configuration from environment variables
-TORRENT_CLIENT="${TORRENT_CLIENT:-qbittorrent}"  # qbittorrent, transmission, deluge
-TORRENT_HOST="${TORRENT_HOST:-localhost}"
-TORRENT_PORT="${TORRENT_PORT:-8080}"
+TORRENT_CLIENT="${TORRENT_CLIENT}"
+TORRENT_HOST="${TORRENT_HOST}"
+TORRENT_PORT="${TORRENT_PORT}"
 TORRENT_USERNAME="${TORRENT_USERNAME}"
 TORRENT_PASSWORD="${TORRENT_PASSWORD}"
 TORRENT_CATEGORY_MOVIES="${TORRENT_CATEGORY_MOVIES:-radarr}"
@@ -26,6 +45,15 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+
+# Exit early if no torrent client configuration is provided
+if [ -z "$TORRENT_CLIENT" ] || [ -z "$TORRENT_HOST" ] || [ -z "$TORRENT_PORT" ]; then
+    echo "No torrent client configuration detected. Skipping download client setup."
+    echo "To configure download clients, set: TORRENT_CLIENT, TORRENT_HOST, and TORRENT_PORT"
+    echo "Additionally, TORRENT_USERNAME and TORRENT_PASSWORD are required for qBittorrent and Transmission"
+    exit 0
+fi
 
 echo "==========================================="
 echo "  Download Client Configuration Script"
@@ -57,44 +85,19 @@ wait_for_service() {
     return 1
 }
 
-# Function to get download client config for qBittorrent
-get_qbittorrent_config() {
-    local category=$1
-    cat <<EOF
-{
-    "enable": true,
-    "protocol": "torrent",
-    "priority": 1,
-    "name": "qBittorrent",
-    "fields": [
-        {
-            "name": "host",
-            "value": "${TORRENT_HOST}"
-        },
-        {
-            "name": "port",
-            "value": ${TORRENT_PORT}
-        },
-        {
-            "name": "useSsl",
-            "value": ${TORRENT_USE_SSL}
-        },
-        {
-            "name": "urlBase",
-            "value": ""
-        },
-        {
-            "name": "username",
-            "value": "${TORRENT_USERNAME}"
-        },
-        {
-            "name": "password",
-            "value": "${TORRENT_PASSWORD}"
-        },
-        {
-            "name": "movieCategory",
-            "value": "${category}"
-        },
+# Function to get download client config
+get_client_config() {
+    local client_type=$1
+    local category=$2
+    local client_name="${client_type^}"
+    
+    # Client-specific configurations
+    local url_base=""
+    local extra_fields=""
+    
+    case "${client_type,,}" in
+        qbittorrent)
+            extra_fields=$(cat <<'EXTRA'
         {
             "name": "recentMoviePriority",
             "value": 0
@@ -115,24 +118,53 @@ get_qbittorrent_config() {
             "name": "firstAndLast",
             "value": false
         }
-    ],
-    "implementationName": "qBittorrent",
-    "implementation": "QBittorrent",
-    "configContract": "QBittorrentSettings",
-    "tags": []
-}
-EOF
-}
-
-# Function to get download client config for Transmission
-get_transmission_config() {
-    local category=$1
+EXTRA
+)
+            ;;
+        transmission)
+            url_base="/transmission/"
+            extra_fields=$(cat <<'EXTRA'
+        {
+            "name": "recentMoviePriority",
+            "value": 0
+        },
+        {
+            "name": "olderMoviePriority",
+            "value": 0
+        },
+        {
+            "name": "addPaused",
+            "value": false
+        }
+EXTRA
+)
+            ;;
+        deluge)
+            extra_fields=$(cat <<'EXTRA'
+        {
+            "name": "recentMoviePriority",
+            "value": 0
+        },
+        {
+            "name": "olderMoviePriority",
+            "value": 0
+        },
+        {
+            "name": "addPaused",
+            "value": false
+        }
+EXTRA
+)
+            ;;
+    esac
+    
+    # Common fields
     cat <<EOF
 {
     "enable": true,
     "protocol": "torrent",
     "priority": 1,
-    "name": "Transmission",
+    "name": "${client_name}-autoconf",
     "fields": [
         {
             "name": "host",
@@ -148,67 +180,22 @@ get_transmission_config() {
         },
         {
             "name": "urlBase",
-            "value": "/transmission/"
+            "value": "${url_base}"
         },
+EOF
+
+    # Add username field only for qBittorrent and Transmission
+    if [[ "${client_type,,}" != "deluge" ]]; then
+        cat <<EOF
         {
             "name": "username",
             "value": "${TORRENT_USERNAME}"
         },
-        {
-            "name": "password",
-            "value": "${TORRENT_PASSWORD}"
-        },
-        {
-            "name": "movieCategory",
-            "value": "${category}"
-        },
-        {
-            "name": "recentMoviePriority",
-            "value": 0
-        },
-        {
-            "name": "olderMoviePriority",
-            "value": 0
-        },
-        {
-            "name": "addPaused",
-            "value": false
-        }
-    ],
-    "implementationName": "Transmission",
-    "implementation": "Transmission",
-    "configContract": "TransmissionSettings",
-    "tags": []
-}
 EOF
-}
+    fi
 
-# Function to get download client config for Deluge
-get_deluge_config() {
-    local category=$1
+    # Password and category fields
     cat <<EOF
-{
-    "enable": true,
-    "protocol": "torrent",
-    "priority": 1,
-    "name": "Deluge",
-    "fields": [
-        {
-            "name": "host",
-            "value": "${TORRENT_HOST}"
-        },
-        {
-            "name": "port",
-            "value": ${TORRENT_PORT}
-        },
-        {
-            "name": "useSsl",
-            "value": ${TORRENT_USE_SSL}
-        },
-        {
-            "name": "urlBase",
-            "value": ""
-        },
         {
             "name": "password",
             "value": "${TORRENT_PASSWORD}"
@@ -217,22 +204,11 @@ get_deluge_config() {
             "name": "movieCategory",
             "value": "${category}"
         },
-        {
-            "name": "recentMoviePriority",
-            "value": 0
-        },
-        {
-            "name": "olderMoviePriority",
-            "value": 0
-        },
-        {
-            "name": "addPaused",
-            "value": false
-        }
+${extra_fields}
     ],
-    "implementationName": "Deluge",
-    "implementation": "Deluge",
-    "configContract": "DelugeSettings",
+    "implementationName": "${client_name}",
+    "implementation": "${client_name}",
+    "configContract": "${client_name}Settings",
     "tags": []
 }
 EOF
@@ -240,34 +216,20 @@ EOF
 
 # Function to add download client to Radarr
 add_downloadclient_to_radarr() {
-    echo -n "Adding ${TORRENT_CLIENT} to Radarr..."
+    local client_name="${TORRENT_CLIENT^}-autoconf"
+    echo -n "Adding ${client_name} to Radarr..."
     
-    # Check if download client already exists
+    # Check if download client already exists by name
     existing=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/downloadclient" | \
-               jq -r ".[] | select(.implementation == \"${TORRENT_CLIENT^}\") | .id")
+               jq -r ".[] | select(.name == \"${client_name}\") | .id")
     
     if [ -n "$existing" ]; then
         echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
         return 0
     fi
     
-    # Get config based on client type
-    case "${TORRENT_CLIENT,,}" in
-        qbittorrent)
-            config=$(get_qbittorrent_config "$TORRENT_CATEGORY_MOVIES")
-            ;;
-        transmission)
-            config=$(get_transmission_config "$TORRENT_CATEGORY_MOVIES")
-            ;;
-        deluge)
-            config=$(get_deluge_config "$TORRENT_CATEGORY_MOVIES")
-            ;;
-        *)
-            echo -e " ${RED}✗${NC}"
-            echo -e "${RED}Unsupported torrent client: $TORRENT_CLIENT${NC}"
-            return 1
-            ;;
-    esac
+    # Get config
+    config=$(get_client_config "${TORRENT_CLIENT,,}" "$TORRENT_CATEGORY_MOVIES")
     
     # Add download client
     response=$(curl -s -X POST \
@@ -288,34 +250,20 @@ add_downloadclient_to_radarr() {
 
 # Function to add download client to Sonarr
 add_downloadclient_to_sonarr() {
-    echo -n "Adding ${TORRENT_CLIENT} to Sonarr..."
+    local client_name="${TORRENT_CLIENT^}-autoconf"
+    echo -n "Adding ${client_name} to Sonarr..."
     
-    # Check if download client already exists
+    # Check if download client already exists by name
     existing=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/downloadclient" | \
-               jq -r ".[] | select(.implementation == \"${TORRENT_CLIENT^}\") | .id")
+               jq -r ".[] | select(.name == \"${client_name}\") | .id")
     
     if [ -n "$existing" ]; then
         echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
         return 0
     fi
     
-    # Get config based on client type
-    case "${TORRENT_CLIENT,,}" in
-        qbittorrent)
-            config=$(get_qbittorrent_config "$TORRENT_CATEGORY_TV")
-            ;;
-        transmission)
-            config=$(get_transmission_config "$TORRENT_CATEGORY_TV")
-            ;;
-        deluge)
-            config=$(get_deluge_config "$TORRENT_CATEGORY_TV")
-            ;;
-        *)
-            echo -e " ${RED}✗${NC}"
-            echo -e "${RED}Unsupported torrent client: $TORRENT_CLIENT${NC}"
-            return 1
-            ;;
-    esac
+    # Get config
+    config=$(get_client_config "${TORRENT_CLIENT,,}" "$TORRENT_CATEGORY_TV")
     
     # Add download client
     response=$(curl -s -X POST \

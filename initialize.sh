@@ -6,6 +6,31 @@ set -e
 
 echo "Initializing container..."
 
+# Validate required environment variables
+MISSING_VARS=()
+
+[ -z "$RADARR__AUTH__APIKEY" ] && MISSING_VARS+=("RADARR__AUTH__APIKEY")
+[ -z "$RADARR__SERVER__PORT" ] && MISSING_VARS+=("RADARR__SERVER__PORT")
+[ -z "$SONARR__AUTH__APIKEY" ] && MISSING_VARS+=("SONARR__AUTH__APIKEY")
+[ -z "$SONARR__SERVER__PORT" ] && MISSING_VARS+=("SONARR__SERVER__PORT")
+[ -z "$PROWLARR__AUTH__APIKEY" ] && MISSING_VARS+=("PROWLARR__AUTH__APIKEY")
+[ -z "$PROWLARR__SERVER__PORT" ] && MISSING_VARS+=("PROWLARR__SERVER__PORT")
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+    echo "Error: Missing required environment variables:"
+    for var in "${MISSING_VARS[@]}"; do
+        echo "  - $var"
+    done
+    echo ""
+    echo "All arr services require the following environment variables:"
+    echo "  *__AUTH__APIKEY"
+    echo "  *__SERVER__PORT"
+    echo "  *__SERVER__URLBASE (optional)"
+    exit 1
+fi
+
+echo "Initializing container..."
+
 # Create directories if they don't exist
 mkdir -p /config /media
 mkdir -p /config/radarr /config/sonarr /config/prowlarr /config/unpackerr
@@ -55,10 +80,10 @@ find /media -type f -exec chmod 666 {} \; 2>/dev/null || true
 # This allows Unpackerr to use user-supplied API keys and URLs
 cat > /etc/systemd/system/unpackerr.service.d/environment.conf <<EOF
 [Service]
-Environment="UN_RADARR_0_API_KEY=${RADARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
-Environment="UN_RADARR_0_URL=http://127.0.0.1:${RADARR__SERVER__PORT:-7878}${RADARR__SERVER__URLBASE}"
-Environment="UN_SONARR_0_API_KEY=${SONARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
-Environment="UN_SONARR_0_URL=http://127.0.0.1:${SONARR__SERVER__PORT:-8989}${SONARR__SERVER__URLBASE}"
+Environment="UN_RADARR_0_API_KEY=${RADARR__AUTH__APIKEY}"
+Environment="UN_RADARR_0_URL=http://127.0.0.1:${RADARR__SERVER__PORT}${RADARR__SERVER__URLBASE}"
+Environment="UN_SONARR_0_API_KEY=${SONARR__AUTH__APIKEY}"
+Environment="UN_SONARR_0_URL=http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
 EOF
 
 chmod 644 /etc/systemd/system/unpackerr.service.d/environment.conf

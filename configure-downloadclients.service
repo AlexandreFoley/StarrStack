@@ -1,0 +1,14 @@
+[Unit]
+Description=Configure download clients for Radarr and Sonarr
+After=radarr.service sonarr.service
+Requires=radarr.service sonarr.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/configure-downloadclients.sh
+RemainAfterExit=yes
+FailureAction=exit
+PassEnvironment=TORRENT_CLIENT TORRENT_HOST TORRENT_PORT TORRENT_USERNAME TORRENT_PASSWORD TORRENT_CATEGORY_MOVIES TORRENT_CATEGORY_TV TORRENT_USE_SSL RADARR__SERVER__PORT RADARR__SERVER__URLBASE RADARR__AUTH__APIKEY SONARR__SERVER__PORT SONARR__SERVER__URLBASE SONARR__AUTH__APIKEY
+
+[Install]
+WantedBy=multi-user.target

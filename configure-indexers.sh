@@ -4,10 +4,18 @@
 
 set -e
 
-# Configuration
-RADARR_URL="${RADARR_URL:-http://localhost:7878}"
-SONARR_URL="${SONARR_URL:-http://localhost:8989}"
-PROWLARR_URL="${PROWLARR_URL:-http://localhost:9696}"
+# Configuration - construct URLs from standard arr environment variables
+RADARR_PORT="${RADARR__SERVER__PORT:-7878}"
+RADARR_URLBASE="${RADARR__SERVER__URLBASE}"
+RADARR_URL="http://localhost:${RADARR_PORT}${RADARR_URLBASE}"
+
+SONARR_PORT="${SONARR__SERVER__PORT:-8989}"
+SONARR_URLBASE="${SONARR__SERVER__URLBASE}"
+SONARR_URL="http://localhost:${SONARR_PORT}${SONARR_URLBASE}"
+
+PROWLARR_PORT="${PROWLARR__SERVER__PORT:-9696}"
+PROWLARR_URLBASE="${PROWLARR__SERVER__URLBASE}"
+PROWLARR_URL="http://localhost:${PROWLARR_PORT}${PROWLARR_URLBASE}"
 
 RADARR_API_KEY="${RADARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
 SONARR_API_KEY="${SONARR__AUTH__APIKEY:-c59b53c7cb39521ead0c0dbc1a61a401}"
@@ -18,6 +26,22 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
+
+# Validate required environment variables
+if [ -z "$RADARR__SERVER__PORT" ] || [ -z "$SONARR__SERVER__PORT" ] || [ -z "$PROWLARR__SERVER__PORT" ] || \
+   [ -z "$RADARR__AUTH__APIKEY" ] || [ -z "$SONARR__AUTH__APIKEY" ] || [ -z "$PROWLARR__AUTH__APIKEY" ]; then
+    echo -e "${RED}Error: Missing required environment variables${NC}"
+    echo "Required variables:"
+    echo "  RADARR__SERVER__PORT (current: ${RADARR__SERVER__PORT:-NOT SET})"
+    echo "  RADARR__AUTH__APIKEY (current: ${RADARR__AUTH__APIKEY:-NOT SET})"
+    echo "  SONARR__SERVER__PORT (current: ${SONARR__SERVER__PORT:-NOT SET})"
+    echo "  SONARR__AUTH__APIKEY (current: ${SONARR__AUTH__APIKEY:-NOT SET})"
+    echo "  PROWLARR__SERVER__PORT (current: ${PROWLARR__SERVER__PORT:-NOT SET})"
+    echo "  PROWLARR__AUTH__APIKEY (current: ${PROWLARR__AUTH__APIKEY:-NOT SET})"
+    echo "Optional variables:"
+    echo "  RADARR__SERVER__URLBASE, SONARR__SERVER__URLBASE, PROWLARR__SERVER__URLBASE"
+    exit 1
+fi
 
 echo "==========================================="
 echo "  Prowlarr Indexer Configuration Script"
@@ -52,11 +76,11 @@ wait_for_service() {
 
 # Function to add Radarr application in Prowlarr
 add_radarr_to_prowlarr() {
-    echo -n "Adding Radarr to Prowlarr..."
+    echo -n "Adding Radarr-autoconf to Prowlarr..."
     
     # Check if Radarr application already exists
     existing=$(curl -s -H "X-Api-Key: $PROWLARR_API_KEY" "$PROWLARR_URL/api/v1/applications" | \
-               jq -r '.[] | select(.name == "Radarr") | .id')
+               jq -r '.[] | select(.name == "Radarr-autoconf") | .id')
     
     if [ -n "$existing" ]; then
         echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
@@ -68,7 +92,7 @@ add_radarr_to_prowlarr() {
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $PROWLARR_API_KEY" \
         -d '{
-            "name": "Radarr",
+            "name": "Radarr-autoconf",
             "syncLevel": "fullSync",
             "implementation": "Radarr",
             "configContract": "RadarrSettings",
@@ -102,11 +126,11 @@ add_radarr_to_prowlarr() {
 
 # Function to add Sonarr application in Prowlarr
 add_sonarr_to_prowlarr() {
-    echo -n "Adding Sonarr to Prowlarr..."
+    echo -n "Adding Sonarr-autoconf to Prowlarr..."
     
     # Check if Sonarr application already exists
     existing=$(curl -s -H "X-Api-Key: $PROWLARR_API_KEY" "$PROWLARR_URL/api/v1/applications" | \
-               jq -r '.[] | select(.name == "Sonarr") | .id')
+               jq -r '.[] | select(.name == "Sonarr-autoconf") | .id')
     
     if [ -n "$existing" ]; then
         echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
@@ -118,7 +142,7 @@ add_sonarr_to_prowlarr() {
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $PROWLARR_API_KEY" \
         -d '{
-            "name": "Sonarr",
+            "name": "Sonarr-autoconf",
             "syncLevel": "fullSync",
             "implementation": "Sonarr",
             "configContract": "SonarrSettings",
@@ -175,13 +199,6 @@ echo "  Radarr:   $RADARR_URL"
 echo "  Sonarr:   $SONARR_URL"
 echo "  Prowlarr: $PROWLARR_URL"
 echo ""
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    echo -e "${RED}Error: jq is required but not installed.${NC}"
-    echo "Install it with: dnf install jq (RHEL/Fedora) or apt install jq (Debian/Ubuntu)"
-    exit 1
-fi
 
 # Wait for all services to be ready
 wait_for_service "Radarr" "$RADARR_URL" "$RADARR_API_KEY" || exit 1
