@@ -174,8 +174,8 @@ jobs:
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}-build-${{ github.run_number }}
-          name: Build ${{ github.run_number }} - Radarr ${{ steps.versions.outputs.radarr }} / Sonarr ${{ steps.versions.outputs.sonarr }} / Prowlarr ${{ steps.versions.outputs.prowlarr }} / Unpackerr ${{ steps.versions.outputs.unpackerr }}
+          tag_name: radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
+          name: Radarr ${{ steps.versions.outputs.radarr }} / Sonarr ${{ steps.versions.outputs.sonarr }} / Prowlarr ${{ steps.versions.outputs.prowlarr }} / Unpackerr ${{ steps.versions.outputs.unpackerr }}
           body: |
             ## Service Versions
             - **Radarr**: ${{ steps.versions.outputs.radarr }}
@@ -186,7 +186,9 @@ jobs:
             ### Image
             - Registry: `ghcr.io/${{ env.REPO_LOWER }}`
             - Tag: `radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}`
-            - Build: `${{ github.run_number }}`
-            - SHA: `${{ github.sha }}`
+            - Latest Build: `${{ github.run_number }}`
+            - Latest SHA: `${{ github.sha }}`
+            
+            _This release is updated automatically when rebuilding with the same service versions._
           draft: false
           prerelease: false
