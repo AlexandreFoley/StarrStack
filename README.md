@@ -7,7 +7,8 @@ A **Single unified container**: All 4 services run together under systemd init. 
 
 - **Lightweight**: Deduplication of identical files across the arr apps.
 - **Pre-configured**: Ready to run with sensible defaults. But change the API key!
-- **Auto-configured Unpackerr**:  Using the information and settings available from within the container are used to setup a basic configuration for unpackerr.
+- **Auto-configured**:  The shared context of the container is used to configure prowlarr and unpackerr interactions with sonarr and radarr.
+- **Torrent client configuration**: Torrent client configuration can be provided as environment variables, they will be applied to sonarr and radarr automatically.
 
 ## Services Included
 
