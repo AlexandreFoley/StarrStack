@@ -124,7 +124,7 @@ RUN dnf install -y --nodocs libicu sqlite jq && \
 
 RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging configure-indexers configure-downloadclients
 
-VOLUME ["/config","/media"]
+VOLUME ["/config","/Media"]
 
 EXPOSE 7878 8989 9696
 
