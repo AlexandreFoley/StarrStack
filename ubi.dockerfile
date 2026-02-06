@@ -10,7 +10,7 @@ ARG UNPACKERR_VERSION
 RUN dnf update -y && \
     dnf install -y --nodocs wget libicu && \
     dnf clean all
-COPY arrstack-install.sh /arrstack-install.sh
+COPY scripts/arrstack-install.sh /arrstack-install.sh
 
 # Stage 2: Download and build Radarr
 FROM builder-base as radarr-builder
@@ -40,7 +40,7 @@ RUN rm -rf /opt/Prowlarr/Prowlarr.Update
 FROM builder-base as unpackerr-builder
 ARG UNPACKERR_VERSION
 RUN echo "Building Unpackerr ${UNPACKERR_VERSION}"
-COPY repo.sh repo.sh
+COPY scripts/repo.sh repo.sh
 RUN yes | bash repo.sh unpackerr
 
 # Stage 6: Consolidation - combine all services and deduplicate
@@ -59,7 +59,7 @@ COPY --from=unpackerr-builder /usr/lib/systemd/system/unpackerr.service /usr/lib
 RUN echo -e "UpdateMethod=External\nUpdateMethodMessage=Update managed by container builder\nBranch=master\n" >> /opt/package_info
 
 # Deduplicate identical files across /opt directories
-COPY deduplicate.sh /deduplicate.sh
+COPY scripts/deduplicate.sh /deduplicate.sh
 RUN bash /deduplicate.sh
 
 # Stage 7: Final stage - minimal image with only what's needed
@@ -95,19 +95,19 @@ COPY --from=consolidator /opt /opt
 COPY --from=consolidator /usr/bin/unpackerr /usr/bin/unpackerr
 COPY --from=consolidator /etc/systemd/system /etc/systemd/system
 COPY --from=consolidator /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
-COPY unpackerr.conf /opt/unpackerr.conf
+COPY config/unpackerr.conf /opt/unpackerr.conf
 
 # Copy permission fix script and service
-COPY initialize.sh /usr/local/bin/initialize.sh
-COPY initialize.service /etc/systemd/system/initialize.service
-COPY logging.service /etc/systemd/system/logging.service
+COPY scripts/initialize.sh /usr/local/bin/initialize.sh
+COPY services/initialize.service /etc/systemd/system/initialize.service
+COPY services/logging.service /etc/systemd/system/logging.service
 RUN chmod +x /usr/local/bin/initialize.sh
 
 # Copy configuration scripts and services
-COPY configure-indexers.sh /usr/local/bin/configure-indexers.sh
-COPY configure-indexers.service /etc/systemd/system/configure-indexers.service
-COPY configure-downloadclients.sh /usr/local/bin/configure-downloadclients.sh
-COPY configure-downloadclients.service /etc/systemd/system/configure-downloadclients.service
+COPY scripts/configure-indexers.sh /usr/local/bin/configure-indexers.sh
+COPY services/configure-indexers.service /etc/systemd/system/configure-indexers.service
+COPY scripts/configure-downloadclients.sh /usr/local/bin/configure-downloadclients.sh
+COPY services/configure-downloadclients.service /etc/systemd/system/configure-downloadclients.service
 RUN chmod +x /usr/local/bin/configure-indexers.sh /usr/local/bin/configure-downloadclients.sh
 
 # Override Unpackerr service with PassEnvironment directives
