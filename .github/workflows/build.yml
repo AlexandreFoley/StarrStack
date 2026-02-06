@@ -135,6 +135,8 @@ jobs:
       contents: read
       packages: write
     continue-on-error: true
+    outputs:
+      success: ${{ steps.build.outcome == 'success' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -156,6 +158,7 @@ jobs:
           password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
       - name: Build and push ARM64 image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -197,11 +200,11 @@ jobs:
           # Determine which images to include in manifest
           IMAGES="ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64"
           
-          if [ "${{ needs.build-arm64.result }}" == "success" ]; then
+          if [ "${{ needs.build-arm64.outputs.success }}" == "true" ]; then
             IMAGES="$IMAGES ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64"
             echo "Including both AMD64 and ARM64 in manifest"
           else
-            echo "ARM64 build failed, creating AMD64-only manifest"
+            echo "ARM64 build failed or was skipped, creating AMD64-only manifest"
           fi
           
           # Create manifest for SHA tag
@@ -276,7 +279,7 @@ jobs:
           docker kill test-arrstack
 
   release:
-    needs: [versions, manifest]
+    needs: [versions, manifest, build-arm64]
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
     permissions:
@@ -299,7 +302,7 @@ jobs:
             - Tag: `radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}`
             - Latest Build: `${{ github.run_number }}`
             - Latest SHA: `${{ github.sha }}`
-            - Architectures: ${{ needs.build-arm64.result == 'success' && 'AMD64, ARM64' || 'AMD64 only (ARM64 build failed)' }}
+            - Architectures: ${{ needs.build-arm64.outputs.success == 'true' && 'AMD64, ARM64' || 'AMD64 only (ARM64 build failed)' }}
             
             _This release is updated automatically when rebuilding with the same service versions._
           draft: false
