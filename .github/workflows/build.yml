@@ -35,15 +35,15 @@ on:
       - '.github/workflows/build.yml'
 
 jobs:
-  build:
+  versions:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
+    outputs:
+      radarr: ${{ steps.versions.outputs.radarr }}
+      sonarr: ${{ steps.versions.outputs.sonarr }}
+      prowlarr: ${{ steps.versions.outputs.prowlarr }}
+      unpackerr: ${{ steps.versions.outputs.unpackerr }}
+      repo_lower: ${{ steps.repo.outputs.repo_lower }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Fetch latest versions
         id: versions
         run: |
@@ -81,19 +81,24 @@ jobs:
           echo "sonarr=$SONARR" >> "$GITHUB_OUTPUT"
           echo "prowlarr=$PROWLARR" >> "$GITHUB_OUTPUT"
           echo "unpackerr=$UNPACKERR" >> "$GITHUB_OUTPUT"
-          
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: arm64
+      - name: Set lowercase repository name
+        id: repo
+        run: |
+          echo "repo_lower=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+  build-amd64:
+    needs: versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Set lowercase repository name
-        run: |
-          echo "REPO_LOWER=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
 
       - name: Log in to Container Registry
         if: github.event_name == 'push' || github.event.inputs.push == 'true'
@@ -103,30 +108,124 @@ jobs:
           username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push AMD64 image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./ubi.dockerfile
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
           load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
           tags: |
-            ghcr.io/${{ env.REPO_LOWER }}:latest
-            ghcr.io/${{ env.REPO_LOWER }}:radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
-            ghcr.io/${{ env.REPO_LOWER }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
+          cache-from: type=gha,scope=amd64
+          cache-to: type=gha,mode=max,scope=amd64
           build-args: |
-            RADARR_VERSION=${{ steps.versions.outputs.radarr }}
-            SONARR_VERSION=${{ steps.versions.outputs.sonarr }}
-            PROWLARR_VERSION=${{ steps.versions.outputs.prowlarr }}
-            UNPACKERR_VERSION=${{ steps.versions.outputs.unpackerr }}
+            RADARR_VERSION=${{ needs.versions.outputs.radarr }}
+            SONARR_VERSION=${{ needs.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ needs.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             VCS_REF=${{ github.sha }}
 
+  build-arm64:
+    needs: versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'push' || github.event.inputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
+          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
+          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Build and push ARM64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./ubi.dockerfile
+          platforms: linux/arm64
+          push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
+          tags: |
+            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
+          cache-from: type=gha,scope=arm64
+          cache-to: type=gha,mode=max,scope=arm64
+          build-args: |
+            RADARR_VERSION=${{ needs.versions.outputs.radarr }}
+            SONARR_VERSION=${{ needs.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ needs.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+
+  manifest:
+    needs: [versions, build-amd64, build-arm64]
+    runs-on: ubuntu-latest
+    if: always() && needs.build-amd64.result == 'success' && (github.event_name == 'push' || github.event.inputs.push == 'true')
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
+          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
+          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          # Determine which images to include in manifest
+          IMAGES="ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64"
+          
+          if [ "${{ needs.build-arm64.result }}" == "success" ]; then
+            IMAGES="$IMAGES ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64"
+            echo "Including both AMD64 and ARM64 in manifest"
+          else
+            echo "ARM64 build failed, creating AMD64-only manifest"
+          fi
+          
+          # Create manifest for SHA tag
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }} $IMAGES
+          
+          # Create manifest for version tag
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }} $IMAGES
+          
+          # Create manifest for latest tag
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:latest $IMAGES
+
+  test:
+    needs: [versions, build-amd64]
+    runs-on: ubuntu-latest
+    if: github.event_name != 'push' && github.event.inputs.push != 'true'
+    steps:
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Test container locally
-        if: github.event_name != 'push' && github.event.inputs.push != 'true'
         run: |
           # Create test directories
           mkdir -p /tmp/test-config /tmp/test-media
@@ -138,7 +237,7 @@ jobs:
             -p 9696:9696 \
             -v /tmp/test-config:/config \
             -v /tmp/test-media:/media \
-            ghcr.io/${{ env.REPO_LOWER }}:${{ github.sha }} &
+            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64 &
           
           sleep 10
           
@@ -176,24 +275,31 @@ jobs:
           
           docker kill test-arrstack
 
+  release:
+    needs: [versions, manifest]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
       - name: Create release
-        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}
-          name: Radarr ${{ steps.versions.outputs.radarr }} / Sonarr ${{ steps.versions.outputs.sonarr }} / Prowlarr ${{ steps.versions.outputs.prowlarr }} / Unpackerr ${{ steps.versions.outputs.unpackerr }}
+          tag_name: radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}
+          name: Radarr ${{ needs.versions.outputs.radarr }} / Sonarr ${{ needs.versions.outputs.sonarr }} / Prowlarr ${{ needs.versions.outputs.prowlarr }} / Unpackerr ${{ needs.versions.outputs.unpackerr }}
           body: |
             ## Service Versions
-            - **Radarr**: ${{ steps.versions.outputs.radarr }}
-            - **Sonarr**: ${{ steps.versions.outputs.sonarr }}
-            - **Prowlarr**: ${{ steps.versions.outputs.prowlarr }}
-            - **Unpackerr**: ${{ steps.versions.outputs.unpackerr }}
+            - **Radarr**: ${{ needs.versions.outputs.radarr }}
+            - **Sonarr**: ${{ needs.versions.outputs.sonarr }}
+            - **Prowlarr**: ${{ needs.versions.outputs.prowlarr }}
+            - **Unpackerr**: ${{ needs.versions.outputs.unpackerr }}
             
             ### Image
-            - Registry: `ghcr.io/${{ env.REPO_LOWER }}`
-            - Tag: `radarr-${{ steps.versions.outputs.radarr }}-sonarr-${{ steps.versions.outputs.sonarr }}-prowlarr-${{ steps.versions.outputs.prowlarr }}-unpackerr-${{ steps.versions.outputs.unpackerr }}`
+            - Registry: `ghcr.io/${{ needs.versions.outputs.repo_lower }}`
+            - Tag: `radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}`
             - Latest Build: `${{ github.run_number }}`
             - Latest SHA: `${{ github.sha }}`
+            - Architectures: ${{ needs.build-arm64.result == 'success' && 'AMD64, ARM64' || 'AMD64 only (ARM64 build failed)' }}
             
             _This release is updated automatically when rebuilding with the same service versions._
           draft: false

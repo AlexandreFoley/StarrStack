@@ -1,5 +1,5 @@
 # Stage 1: Base builder with common tools
-FROM registry.access.redhat.com/ubi9/ubi-init as builder-base
+FROM registry.access.redhat.com/ubi9/ubi-init AS builder-base
 
 # Declare build arguments for version tracking
 ARG RADARR_VERSION
@@ -13,7 +13,7 @@ RUN dnf update -y && \
 COPY scripts/arrstack-install.sh /arrstack-install.sh
 
 # Stage 2: Download and build Radarr
-FROM builder-base as radarr-builder
+FROM builder-base AS radarr-builder
 ARG RADARR_VERSION
 RUN echo "Building Radarr ${RADARR_VERSION}"
 RUN groupadd radarr
@@ -21,7 +21,7 @@ RUN bash arrstack-install.sh radarr radarr radarr
 RUN rm -rf /opt/Radarr/Radarr.Update
 
 # Stage 3: Download and build Sonarr
-FROM builder-base as sonarr-builder
+FROM builder-base AS sonarr-builder
 ARG SONARR_VERSION
 RUN echo "Building Sonarr ${SONARR_VERSION}"
 RUN groupadd sonarr
@@ -29,7 +29,7 @@ RUN bash arrstack-install.sh sonarr sonarr sonarr
 RUN rm -rf /opt/Sonarr/Sonarr.Update
 
 # Stage 4: Download and build Prowlarr
-FROM builder-base as prowlarr-builder
+FROM builder-base AS prowlarr-builder
 ARG PROWLARR_VERSION
 RUN echo "Building Prowlarr ${PROWLARR_VERSION}"
 RUN groupadd prowlarr
@@ -37,14 +37,14 @@ RUN bash arrstack-install.sh prowlarr prowlarr prowlarr
 RUN rm -rf /opt/Prowlarr/Prowlarr.Update
 
 # Stage 5: Download and build Unpackerr
-FROM builder-base as unpackerr-builder
+FROM builder-base AS unpackerr-builder
 ARG UNPACKERR_VERSION
 RUN echo "Building Unpackerr ${UNPACKERR_VERSION}"
 COPY scripts/repo.sh repo.sh
 RUN yes | bash repo.sh unpackerr
 
 # Stage 6: Consolidation - combine all services and deduplicate
-FROM builder-base as consolidator
+FROM builder-base AS consolidator
 # Copy all services from their respective builders
 COPY --from=radarr-builder /opt/Radarr /opt/Radarr
 COPY --from=radarr-builder /etc/systemd/system/radarr.service /etc/systemd/system/radarr.service
