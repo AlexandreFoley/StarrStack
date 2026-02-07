@@ -1,0 +1,88 @@
+# Shared variables
+
+x-QBT-username: &qbittorrent-username "starruser"
+x-QBT-password: &qbittorrent-password "use-secrets-instead"
+
+services:
+  qbittorrent:
+    image: ghcr.io/alexandrefoley/qbittorrent
+    container_name: qbittorrent
+    restart: unless-stopped
+    
+    ports:
+      - "8080:8080"  # qBittorrent WebUI
+    
+    volumes:
+      - qbittorrent-config:/config:rw
+      - Media:/Media:rw
+    
+    environment:
+      PUID: 1000
+      PGID: 1000
+      UMASK: 002
+      TZ: Etc/UTC
+      WEBUI_PORTS: 8080/tcp
+      LIBTORRENT: v2
+      WEBUI_USERNAME: *qbittorrent-username
+      WEBUI_PASSWORD: *qbittorrent-password
+
+  starr:
+    image: ubi:latest
+    container_name: starr
+    restart: unless-stopped
+    tty: true
+    stdin_open: true
+    depends_on:
+      - qbittorrent
+    
+    # Port mappings
+    ports:
+      - "7878:7878"  # Radarr
+      - "8989:8989"  # Sonarr
+      - "9696:9696"  # Prowlarr
+    
+    # Volume mounts - named volumes for persistence
+    volumes:
+      - config:/config:rw
+      - Media:/Media:rw
+    
+    
+    # Environment variables
+    environment:
+      # Radarr
+      RADARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      RADARR__AUTH__ENABLED: "false"
+      RADARR__SERVER__URLBASE: ""
+      RADARR__SERVER__PORT: "7878"
+      RADARR__AUTH__METHOD: "External"
+      
+      # Sonarr
+      SONARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      SONARR__AUTH__ENABLED: "false"
+      SONARR__SERVER__URLBASE: ""
+      SONARR__SERVER__PORT: "8989"
+      SONARR__AUTH__METHOD: "External"
+      
+      # Prowlarr
+      PROWLARR__AUTH__APIKEY: "ccf889af356d47bebd03fc30f79b1127"
+      PROWLARR__AUTH__ENABLED: "false"
+      PROWLARR__SERVER__URLBASE: ""
+      PROWLARR__SERVER__PORT: "9696"
+      PROWLARR__AUTH__METHOD: "External"
+      
+      # Download client configuration
+      TORRENT_CLIENT: "qbittorrent"
+      TORRENT_HOST: "qbittorrent"
+      TORRENT_PORT: "8080"
+      TORRENT_USERNAME: *qbittorrent-username
+      TORRENT_PASSWORD: *qbittorrent-password
+      TORRENT_CATEGORY_MOVIES: "radarr"
+      TORRENT_CATEGORY_TV: "sonarr"
+
+volumes:
+  qbittorrent-config:
+    driver: local
+  config:
+    driver: local
+  Media:
+    driver: local

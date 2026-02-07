@@ -40,6 +40,10 @@ TORRENT_CATEGORY_MOVIES="${TORRENT_CATEGORY_MOVIES:-radarr}"
 TORRENT_CATEGORY_TV="${TORRENT_CATEGORY_TV:-sonarr}"
 TORRENT_USE_SSL="${TORRENT_USE_SSL:-false}"
 
+# Root directory configuration
+RADARR_ROOT_DIR="${RADARR_ROOT_DIR:-/media/Films}"
+SONARR_ROOT_DIR="${SONARR_ROOT_DIR:-/media/TV}"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -282,14 +286,76 @@ add_downloadclient_to_sonarr() {
     fi
 }
 
+# Function to configure root directory for Radarr
+configure_root_directory_radarr() {
+    echo -n "Configuring root directory for Radarr..."
+    
+    # Get existing root directories
+    existing_dirs=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/rootfolder")
+    
+    # Check if the default root directory already exists
+    if echo "$existing_dirs" | jq -e ".[] | select(.path == \"${RADARR_ROOT_DIR}\")" > /dev/null 2>&1; then
+        echo -e " ${YELLOW}Already configured${NC}"
+        return 0
+    fi
+    
+    # Add the root directory
+    response=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: $RADARR_API_KEY" \
+        -d "{\"path\": \"${RADARR_ROOT_DIR}\"}" \
+        "$RADARR_URL/api/v3/rootfolder")
+    
+    if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
+        echo -e " ${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Error response: $response${NC}"
+        return 1
+    fi
+}
+
+# Function to configure root directory for Sonarr
+configure_root_directory_sonarr() {
+    echo -n "Configuring root directory for Sonarr..."
+    
+    # Get existing root directories
+    existing_dirs=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/rootfolder")
+    
+    # Check if the default root directory already exists
+    if echo "$existing_dirs" | jq -e ".[] | select(.path == \"${SONARR_ROOT_DIR}\")" > /dev/null 2>&1; then
+        echo -e " ${YELLOW}Already configured${NC}"
+        return 0
+    fi
+    
+    # Add the root directory
+    response=$(curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: $SONARR_API_KEY" \
+        -d "{\"path\": \"${SONARR_ROOT_DIR}\"}" \
+        "$SONARR_URL/api/v3/rootfolder")
+    
+    if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
+        echo -e " ${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Error response: $response${NC}"
+        return 1
+    fi
+}
+
 # Main execution
 echo "Configuration:"
-echo "  Radarr:          $RADARR_URL"
-echo "  Sonarr:          $SONARR_URL"
-echo "  Client Type:     $TORRENT_CLIENT"
-echo "  Client Host:     $TORRENT_HOST:$TORRENT_PORT"
-echo "  Movie Category:  $TORRENT_CATEGORY_MOVIES"
-echo "  TV Category:     $TORRENT_CATEGORY_TV"
+echo "  Radarr:              $RADARR_URL"
+echo "  Sonarr:              $SONARR_URL"
+echo "  Client Type:         $TORRENT_CLIENT"
+echo "  Client Host:         $TORRENT_HOST:$TORRENT_PORT"
+echo "  Movie Category:      $TORRENT_CATEGORY_MOVIES"
+echo "  TV Category:         $TORRENT_CATEGORY_TV"
+echo "  Radarr Root Dir:     $RADARR_ROOT_DIR"
+echo "  Sonarr Root Dir:     $SONARR_ROOT_DIR"
 echo ""
 
 # Check if jq is installed
@@ -309,6 +375,13 @@ echo "Configuring download clients..."
 # Add download clients
 add_downloadclient_to_radarr || exit 1
 add_downloadclient_to_sonarr || exit 1
+
+echo ""
+echo "Configuring root directories..."
+
+# Configure root directories
+configure_root_directory_radarr || exit 1
+configure_root_directory_sonarr || exit 1
 
 echo ""
 echo -e "${GREEN}==========================================="

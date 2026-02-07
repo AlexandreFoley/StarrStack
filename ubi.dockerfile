@@ -124,7 +124,7 @@ RUN dnf install -y --nodocs libicu sqlite jq && \
 
 RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging configure-indexers configure-downloadclients
 
-VOLUME ["/config","/Media"]
+VOLUME ["/config","/media"]
 
 EXPOSE 7878 8989 9696
 
@@ -143,7 +143,7 @@ ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     PROWLARR__AUTH__ENABLED="true" \
     PROWLARR__SERVER__URLBASE="" \
     PROWLARR__SERVER__PORT="9696" \
-    PROWLARR__AUTH__METHOD="Forms"
+    PROWLARR__AUTH__METHOD="Forms" 
 
 # Configure systemd to not redirect stdout/stderr to /dev/null
 # This allows systemd and service messages to be captured by podman logs
