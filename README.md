@@ -155,7 +155,6 @@ WantedBy=default.target
 
 1. **Enable and start**:
    ```bash
-   systemctl --user enable starr.container
    systemctl --user start starr.container
    ```
 
