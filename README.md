@@ -1,3 +1,7 @@
+# Author's note
+
+This is still a work in progress. Use at your own risk.
+
 # Starr - Unified Arr Services Container
 
 A disk-space optimized Podman/Docker image containing Radarr, Sonarr, Prowlarr, and Unpackerr running under systemd. Image size: **~700MB**.
