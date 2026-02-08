@@ -14,7 +14,7 @@ services:
     
     volumes:
       - qbittorrent-config:/config:rw
-      - Media:/Media:rw
+      - media:/media:rw
     
     environment:
       PUID: 1000
@@ -27,7 +27,7 @@ services:
       WEBUI_PASSWORD: *qbittorrent-password
 
   starr:
-    image: ubi:latest
+    image: starr:latest
     container_name: starr
     restart: unless-stopped
     tty: true
@@ -44,7 +44,7 @@ services:
     # Volume mounts - named volumes for persistence
     volumes:
       - config:/config:rw
-      - Media:/Media:rw
+      - media:/media:rw
     
     
     # Environment variables
@@ -84,5 +84,5 @@ volumes:
     driver: local
   config:
     driver: local
-  Media:
+  media:
     driver: local

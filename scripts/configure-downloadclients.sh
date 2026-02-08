@@ -286,8 +286,40 @@ add_downloadclient_to_sonarr() {
     fi
 }
 
+# Function to ensure root directory exists on filesystem with proper permissions
+ensure_root_directory_exists() {
+    local root_dir=$1
+    local app_name=$2
+    
+    if [ ! -d "$root_dir" ]; then
+        echo -n "Creating root directory for $app_name at $root_dir..."
+        if mkdir -p "$root_dir"; then
+            echo -e " ${GREEN}✓${NC}"
+            # Ensure proper permissions
+            echo -n "Setting permissions for $root_dir..."
+            if chmod 777 "$root_dir"; then
+                echo -e " ${GREEN}✓${NC}"
+            else
+                echo -e " ${RED}✗${NC}"
+                echo -e "${RED}Warning: Failed to set permissions for $root_dir${NC}"
+                # Don't fail on permission change, as this might be expected in some environments
+            fi
+        else
+            echo -e " ${RED}✗${NC}"
+            echo -e "${RED}Error: Failed to create directory $root_dir${NC}"
+            return 1
+        fi
+    fi
+    
+    
+    return 0
+}
+
 # Function to configure root directory for Radarr
 configure_root_directory_radarr() {
+    # Ensure the directory exists on filesystem first
+    ensure_root_directory_exists "$RADARR_ROOT_DIR" "Radarr" || return 1
+    
     echo -n "Configuring root directory for Radarr..."
     
     # Get existing root directories
@@ -318,6 +350,9 @@ configure_root_directory_radarr() {
 
 # Function to configure root directory for Sonarr
 configure_root_directory_sonarr() {
+    # Ensure the directory exists on filesystem first
+    ensure_root_directory_exists "$SONARR_ROOT_DIR" "Sonarr" || return 1
+    
     echo -n "Configuring root directory for Sonarr..."
     
     # Get existing root directories

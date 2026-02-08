@@ -63,7 +63,7 @@ COPY scripts/deduplicate.sh /deduplicate.sh
 RUN bash /deduplicate.sh
 
 # Stage 7: Final stage - minimal image with only what's needed
-FROM registry.access.redhat.com/ubi9/ubi-init as final
+FROM registry.access.redhat.com/ubi9/ubi-init AS final
 
 # Declare build arguments for labels
 ARG RADARR_VERSION
@@ -76,9 +76,12 @@ LABEL org.opencontainers.image.title="Starr Stack" \
       org.opencontainers.image.description="Unified container with Radarr, Sonarr, Prowlarr, and Unpackerr" \
       org.opencontainers.image.vendor="Alexandre Foley" \
       org.opencontainers.image.source="https://github.com/AlexandreFoley/StarrStack" \
+      org.opencontainers.image.documentation="https://github.com/AlexandreFoley/StarrStack" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.url="https://github.com/AlexandreFoley/StarrStack" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.authors="Alexandre Foley" \
       radarr.version="${RADARR_VERSION}" \
       sonarr.version="${SONARR_VERSION}" \
       prowlarr.version="${PROWLARR_VERSION}" \
