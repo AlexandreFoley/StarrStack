@@ -24,11 +24,11 @@ jobs:
           
           if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
             echo "needs-update=true" >> "$GITHUB_OUTPUT"
-            echo "$NAME $LATEST (published: $PUBLISHED)"
           else
             echo "needs-update=false" >> "$GITHUB_OUTPUT"
             echo "$NAME $LATEST is older than last check"
           fi
+          echo "$NAME $LATEST (published: $PUBLISHED)"
         }
     outputs:
       radarr-version: ${{ steps.check-radarr.outputs.latest-version }}
