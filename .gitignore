@@ -1,0 +1,26 @@
+# Configuration and data mounts
+compose/mounts/
+mounts/
+
+# Secrets and credentials
+*.env
+.env.*
+secrets/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak

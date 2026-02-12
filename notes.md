@@ -1,9 +1,7 @@
 - structure:
     - one custom container for sonarr,radarr,prowlarr,etc
     - one container for buildarr
-        - Maybe later
-        - it's incomplete and looks abandonned (no updates in a year).
-        - build my own based on golift/starr?
+        - not needed. the webapi are well documented and llm make working with those a breeze.
     - one container for qbittorrent+VPN
 
 - Image custom pour les *arr:

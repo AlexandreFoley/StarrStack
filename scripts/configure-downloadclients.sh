@@ -381,6 +381,96 @@ configure_root_directory_sonarr() {
     fi
 }
 
+# Function to enable rename settings on fresh install for Radarr
+configure_rename_radarr() {
+    local marker_file="/config/radarr/rename_activated"
+    
+    # Check if rename has already been configured
+    if [ -f "$marker_file" ]; then
+        echo -e "Radarr rename setting: ${YELLOW}Already configured (preserving user preference)${NC}"
+        return 0
+    fi
+    
+    echo -n "Enabling movie rename for Radarr (fresh install)..."
+    
+    # Get current naming config
+    naming_config=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/config/naming")
+    
+    # Extract the ID from the config
+    config_id=$(echo "$naming_config" | jq -r '.id')
+    
+    if [ -z "$config_id" ] || [ "$config_id" = "null" ]; then
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Warning: Failed to get naming config ID${NC}"
+        return 0
+    fi
+    
+    # Update naming config to enable RenameMovies
+    updated_config=$(echo "$naming_config" | jq '.renameMovies = true')
+    
+    response=$(curl -s -X PUT \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: $RADARR_API_KEY" \
+        -d "$updated_config" \
+        "$RADARR_URL/api/v3/config/naming/$config_id")
+    
+    if echo "$response" | jq -e '.renameMovies' > /dev/null 2>&1; then
+        # Create marker file to indicate rename has been configured
+        touch "$marker_file"
+        echo -e " ${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Warning: Failed to enable rename${NC}"
+        return 0  # Don't fail the script, just warn
+    fi
+}
+
+# Function to enable rename settings on fresh install for Sonarr
+configure_rename_sonarr() {
+    local marker_file="/config/sonarr/rename_activated"
+    
+    # Check if rename has already been configured
+    if [ -f "$marker_file" ]; then
+        echo -e "Sonarr rename setting: ${YELLOW}Already configured (preserving user preference)${NC}"
+        return 0
+    fi
+    
+    echo -n "Enabling episode rename for Sonarr (fresh install)..."
+    
+    # Get current naming config
+    naming_config=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/config/naming")
+    
+    # Extract the ID from the config
+    config_id=$(echo "$naming_config" | jq -r '.id')
+    
+    if [ -z "$config_id" ] || [ "$config_id" = "null" ]; then
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Warning: Failed to get naming config ID${NC}"
+        return 0
+    fi
+    
+    # Update naming config to enable RenameEpisodes
+    updated_config=$(echo "$naming_config" | jq '.renameEpisodes = true')
+    
+    response=$(curl -s -X PUT \
+        -H "Content-Type: application/json" \
+        -H "X-Api-Key: $SONARR_API_KEY" \
+        -d "$updated_config" \
+        "$SONARR_URL/api/v3/config/naming/$config_id")
+    
+    if echo "$response" | jq -e '.renameEpisodes' > /dev/null 2>&1; then
+        # Create marker file to indicate rename has been configured
+        touch "$marker_file"
+        echo -e " ${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e " ${RED}✗${NC}"
+        echo -e "${RED}Warning: Failed to enable rename${NC}"
+        return 0  # Don't fail the script, just warn
+    fi
+}
+
 # Main execution
 echo "Configuration:"
 echo "  Radarr:              $RADARR_URL"
@@ -417,6 +507,13 @@ echo "Configuring root directories..."
 # Configure root directories
 configure_root_directory_radarr || exit 1
 configure_root_directory_sonarr || exit 1
+
+echo ""
+echo "Configuring rename settings (fresh install only)..."
+
+# Configure rename settings
+configure_rename_radarr
+configure_rename_sonarr
 
 echo ""
 echo -e "${GREEN}==========================================="

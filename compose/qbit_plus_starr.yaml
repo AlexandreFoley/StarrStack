@@ -13,8 +13,8 @@ services:
       - "8080:8080"  # qBittorrent WebUI
     
     volumes:
-      - qbittorrent-config:/config:rw
-      - media:/media:rw
+      - ./mounts/qbittorrent-config:/config:rw
+      - ./mounts/media:/media:rw
     
     environment:
       PUID: 1000
@@ -27,7 +27,7 @@ services:
       WEBUI_PASSWORD: *qbittorrent-password
 
   starr:
-    image: starr:latest
+    image: ghcr.io/alexandrefoley/starrstack:latest 
     container_name: starr
     restart: unless-stopped
     tty: true
@@ -41,10 +41,10 @@ services:
       - "8989:8989"  # Sonarr
       - "9696:9696"  # Prowlarr
     
-    # Volume mounts - named volumes for persistence
+    # Volume mounts - bind mounts to local directories
     volumes:
-      - config:/config:rw
-      - media:/media:rw
+      - ./mounts/config:/config:rw
+      - ./mounts/media:/media:rw
     
     
     # Environment variables
@@ -78,11 +78,3 @@ services:
       TORRENT_PASSWORD: *qbittorrent-password
       TORRENT_CATEGORY_MOVIES: "radarr"
       TORRENT_CATEGORY_TV: "sonarr"
-
-volumes:
-  qbittorrent-config:
-    driver: local
-  config:
-    driver: local
-  media:
-    driver: local
