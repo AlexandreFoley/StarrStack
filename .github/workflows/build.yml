@@ -116,8 +116,7 @@ jobs:
           platforms: linux/amd64
           push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
           load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
-          tags: |
-            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
+          tags: ${{ (github.event_name == 'push' || github.event.inputs.push == 'true') && format('ghcr.io/{0}:{1}-amd64', needs.versions.outputs.repo_lower, github.sha) || format('starrstack-test-amd64:{0}', github.sha) }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
           build-args: |
@@ -127,6 +126,65 @@ jobs:
             UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             VCS_REF=${{ github.sha }}
+
+      - name: Test AMD64 image locally
+        if: github.event_name != 'push' && github.event.inputs.push != 'true'
+        run: |
+          mkdir -p /tmp/test-config-amd64 /tmp/test-media-amd64
+
+          docker run --rm -d --name test-arrstack-amd64 \
+            -p 7878:7878 \
+            -p 8989:8989 \
+            -p 9696:9696 \
+            -v /tmp/test-config-amd64:/config \
+            -v /tmp/test-media-amd64:/media \
+            starrstack-test-amd64:${{ github.sha }}
+
+          echo "Waiting for services to start..."
+          for i in $(seq 1 12); do
+            sleep 10
+            echo "  ($((i * 10))s elapsed)"
+            if curl -fsS http://localhost:7878/api/v3/system/status >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8989/api/v3/system/status >/dev/null 2>&1 && \
+               curl -fsS http://localhost:9696/api/v1/system/status >/dev/null 2>&1; then
+              echo "All services ready after $((i * 10)) seconds"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "Services did not start within 120 seconds"
+              docker logs test-arrstack-amd64 2>&1 | head -200 || true
+              docker rm -f test-arrstack-amd64 || true
+              exit 1
+            fi
+          done
+
+          echo "Testing Radarr..."
+          curl -fsS http://localhost:7878/api/v3/system/status >/dev/null && echo "✓ Radarr responding" || {
+            echo "✗ Radarr not responding"
+            docker logs test-arrstack-amd64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-amd64 || true
+            exit 1
+          }
+
+          echo "Testing Sonarr..."
+          curl -fsS http://localhost:8989/api/v3/system/status >/dev/null && echo "✓ Sonarr responding" || {
+            echo "✗ Sonarr not responding"
+            docker logs test-arrstack-amd64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-amd64 || true
+            exit 1
+          }
+
+          echo "Testing Prowlarr..."
+          curl -fsS http://localhost:9696/api/v1/system/status >/dev/null && echo "✓ Prowlarr responding" || {
+            echo "✗ Prowlarr not responding"
+            docker logs test-arrstack-amd64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-amd64 || true
+            exit 1
+          }
+
+          echo "Container logs:"
+          docker logs test-arrstack-amd64 2>&1 | head -200 || true
+          docker rm -f test-arrstack-amd64 || true
 
   build-arm64:
     needs: versions
@@ -160,8 +218,8 @@ jobs:
           file: ./ubi.dockerfile
           platforms: linux/arm64
           push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
-          tags: |
-            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
+          load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
+          tags: ${{ (github.event_name == 'push' || github.event.inputs.push == 'true') && format('ghcr.io/{0}:{1}-arm64', needs.versions.outputs.repo_lower, github.sha) || format('starrstack-test-arm64:{0}', github.sha) }}
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
           build-args: |
@@ -171,6 +229,65 @@ jobs:
             UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
             BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
             VCS_REF=${{ github.sha }}
+
+      - name: Test ARM64 image locally
+        if: github.event_name != 'push' && github.event.inputs.push != 'true'
+        run: |
+          mkdir -p /tmp/test-config-arm64 /tmp/test-media-arm64
+
+          docker run --rm -d --name test-arrstack-arm64 \
+            -p 7878:7878 \
+            -p 8989:8989 \
+            -p 9696:9696 \
+            -v /tmp/test-config-arm64:/config \
+            -v /tmp/test-media-arm64:/media \
+            starrstack-test-arm64:${{ github.sha }}
+
+          echo "Waiting for services to start..."
+          for i in $(seq 1 12); do
+            sleep 10
+            echo "  ($((i * 10))s elapsed)"
+            if curl -fsS http://localhost:7878/api/v3/system/status >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8989/api/v3/system/status >/dev/null 2>&1 && \
+               curl -fsS http://localhost:9696/api/v1/system/status >/dev/null 2>&1; then
+              echo "All services ready after $((i * 10)) seconds"
+              break
+            fi
+            if [ "$i" -eq 12 ]; then
+              echo "Services did not start within 120 seconds"
+              docker logs test-arrstack-arm64 2>&1 | head -200 || true
+              docker rm -f test-arrstack-arm64 || true
+              exit 1
+            fi
+          done
+
+          echo "Testing Radarr..."
+          curl -fsS http://localhost:7878/api/v3/system/status >/dev/null && echo "✓ Radarr responding" || {
+            echo "✗ Radarr not responding"
+            docker logs test-arrstack-arm64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-arm64 || true
+            exit 1
+          }
+
+          echo "Testing Sonarr..."
+          curl -fsS http://localhost:8989/api/v3/system/status >/dev/null && echo "✓ Sonarr responding" || {
+            echo "✗ Sonarr not responding"
+            docker logs test-arrstack-arm64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-arm64 || true
+            exit 1
+          }
+
+          echo "Testing Prowlarr..."
+          curl -fsS http://localhost:9696/api/v1/system/status >/dev/null && echo "✓ Prowlarr responding" || {
+            echo "✗ Prowlarr not responding"
+            docker logs test-arrstack-arm64 2>&1 | head -200 || true
+            docker rm -f test-arrstack-arm64 || true
+            exit 1
+          }
+
+          echo "Container logs:"
+          docker logs test-arrstack-arm64 2>&1 | head -200 || true
+          docker rm -f test-arrstack-arm64 || true
 
   manifest:
     needs: [versions, build-amd64, build-arm64]
@@ -210,68 +327,6 @@ jobs:
           
           # Create manifest for latest tag
           docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:latest $IMAGES
-
-  test:
-    needs: [versions, build-amd64]
-    runs-on: ubuntu-latest
-    if: github.event_name != 'push' && github.event.inputs.push != 'true'
-    steps:
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Test container locally
-        run: |
-          # Create test directories
-          mkdir -p /tmp/test-config /tmp/test-media
-          
-          # Run container in background
-          docker run --rm -d --name test-arrstack \
-            -p 7878:7878 \
-            -p 8989:8989 \
-            -p 9696:9696 \
-            -v /tmp/test-config:/config \
-            -v /tmp/test-media:/media \
-            ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64 &
-          
-          sleep 10
-          
-          # Test endpoints
-          echo "Testing Radarr..."
-          if curl -s http://localhost:7878/api/v3/system/status > /dev/null 2>&1; then
-            echo "✓ Radarr responding"
-          else
-            echo "✗ Radarr not responding"
-            docker kill test-arrstack
-            exit 1
-          fi
-          
-          echo "Testing Sonarr..."
-          if curl -s http://localhost:8989/api/v3/system/status > /dev/null 2>&1; then
-            echo "✓ Sonarr responding"
-          else
-            echo "✗ Sonarr not responding"
-            docker kill test-arrstack
-            exit 1
-          fi
-          
-          echo "Testing Prowlarr..."
-          if curl -s http://localhost:9696/api/v1/system/status > /dev/null 2>&1; then
-            echo "✓ Prowlarr responding"
-          else
-            echo "✗ Prowlarr not responding"
-            docker kill test-arrstack
-            exit 1
-          fi
-          
-          # Check container logs for errors
-          echo "Container logs:"
-          docker logs test-arrstack | head -50
-          
-          docker kill test-arrstack
 
   release:
     needs: [versions, manifest, build-arm64]
