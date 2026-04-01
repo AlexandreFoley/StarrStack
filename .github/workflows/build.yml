@@ -108,15 +108,15 @@ jobs:
           username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
-      - name: Build and push AMD64 image
+      - name: Build AMD64 image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./ubi.dockerfile
           platforms: linux/amd64
-          push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
-          load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
-          tags: ${{ (github.event_name == 'push' || github.event.inputs.push == 'true') && format('ghcr.io/{0}:{1}-amd64', needs.versions.outputs.repo_lower, github.sha) || format('starrstack-test-amd64:{0}', github.sha) }}
+          push: false
+          load: true
+          tags: starrstack-test-amd64:${{ github.sha }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
           build-args: |
@@ -128,7 +128,6 @@ jobs:
             VCS_REF=${{ github.sha }}
 
       - name: Test AMD64 image locally
-        if: github.event_name != 'push' && github.event.inputs.push != 'true'
         run: |
           mkdir -p /tmp/test-config-amd64 /tmp/test-media-amd64
 
@@ -186,6 +185,12 @@ jobs:
           docker logs test-arrstack-amd64 2>&1 | head -200 || true
           docker rm -f test-arrstack-amd64 || true
 
+      - name: Push AMD64 image
+        if: github.event_name == 'push' || github.event.inputs.push == 'true'
+        run: |
+          docker tag starrstack-test-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
+          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
+
   build-arm64:
     needs: versions
     runs-on: ubuntu-24.04-arm
@@ -210,16 +215,16 @@ jobs:
           username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
           password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
 
-      - name: Build and push ARM64 image
+      - name: Build ARM64 image
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./ubi.dockerfile
           platforms: linux/arm64
-          push: ${{ github.event_name == 'push' || github.event.inputs.push == 'true' }}
-          load: ${{ github.event_name != 'push' && github.event.inputs.push != 'true' }}
-          tags: ${{ (github.event_name == 'push' || github.event.inputs.push == 'true') && format('ghcr.io/{0}:{1}-arm64', needs.versions.outputs.repo_lower, github.sha) || format('starrstack-test-arm64:{0}', github.sha) }}
+          push: false
+          load: true
+          tags: starrstack-test-arm64:${{ github.sha }}
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
           build-args: |
@@ -231,7 +236,6 @@ jobs:
             VCS_REF=${{ github.sha }}
 
       - name: Test ARM64 image locally
-        if: github.event_name != 'push' && github.event.inputs.push != 'true'
         run: |
           mkdir -p /tmp/test-config-arm64 /tmp/test-media-arm64
 
@@ -288,6 +292,12 @@ jobs:
           echo "Container logs:"
           docker logs test-arrstack-arm64 2>&1 | head -200 || true
           docker rm -f test-arrstack-arm64 || true
+
+      - name: Push ARM64 image
+        if: github.event_name == 'push' || github.event.inputs.push == 'true'
+        run: |
+          docker tag starrstack-test-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
+          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
 
   manifest:
     needs: [versions, build-amd64, build-arm64]
