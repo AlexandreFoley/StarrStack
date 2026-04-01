@@ -79,18 +79,34 @@ jobs:
       - name: Summarize updates
         id: summary
         run: |
-          if [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]] || \
-             [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]] || \
-             [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]] || \
-             [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]]; then
-            echo "any-updates=true" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+
+          any=false
+          updates=()
+
+          if [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]]; then
+            any=true
+            updates+=("  - Radarr: ${{ steps.check-radarr.outputs.latest-version }}")
+          fi
+          if [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]]; then
+            any=true
+            updates+=("  - Sonarr: ${{ steps.check-sonarr.outputs.latest-version }}")
+          fi
+          if [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]]; then
+            any=true
+            updates+=("  - Prowlarr: ${{ steps.check-prowlarr.outputs.latest-version }}")
+          fi
+          if [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]]; then
+            any=true
+            updates+=("  - Unpackerr: ${{ steps.check-unpackerr.outputs.latest-version }}")
+          fi
+
+          echo "any-updates=$any" >> "$GITHUB_OUTPUT"
+
+          if [[ "$any" == "true" ]]; then
             echo "Updates available:"
-            [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]] && echo "  - Radarr: ${{ steps.check-radarr.outputs.latest-version }}"
-            [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]] && echo "  - Sonarr: ${{ steps.check-sonarr.outputs.latest-version }}"
-            [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]] && echo "  - Prowlarr: ${{ steps.check-prowlarr.outputs.latest-version }}"
-            [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]] && echo "  - Unpackerr: ${{ steps.check-unpackerr.outputs.latest-version }}"
+            printf '%s\n' "${updates[@]}"
           else
-            echo "any-updates=false" >> "$GITHUB_OUTPUT"
             echo "All services are up to date"
           fi
 
