@@ -23,6 +23,7 @@ fi
 # /tmp is not shared between host and podman machine on macOS
 TEST_BASE_DIR="/tmp/starr-test"
 if [ "$(uname)" = "Darwin" ]; then
+  echo "MacOS detected, working in $HOME/.starr-test"
   TEST_BASE_DIR="$HOME/.starr-test"
 fi
 
@@ -46,9 +47,9 @@ echo "Waiting for services to start..."
 for i in $(seq 1 12); do
   sleep 10
   echo "  ($((i * 10))s elapsed)"
-  if curl -s http://localhost:7878/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
-     curl -s http://localhost:8989/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
-     curl -s http://localhost:9696/api/v1/system/status?apikey=${API_KEY}  2>&1; then
+  if curl  http://localhost:7878/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
+     curl  http://localhost:8989/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
+     curl  http://localhost:9696/api/v1/system/status?apikey=${API_KEY}  2>&1; then
     echo "All services ready after $((i * 10)) seconds"
     break
   fi
