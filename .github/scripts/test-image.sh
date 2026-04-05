@@ -46,9 +46,9 @@ echo "Waiting for services to start..."
 for i in $(seq 1 12); do
   sleep 10
   echo "  ($((i * 10))s elapsed)"
-  if curl -fsS http://localhost:7878/api/v3/system/status?apikey=${API_KEY} >/dev/null 2>&1 && \
-     curl -fsS http://localhost:8989/api/v3/system/status?apikey=${API_KEY} >/dev/null 2>&1 && \
-     curl -fsS http://localhost:9696/api/v1/system/status?apikey=${API_KEY} >/dev/null 2>&1; then
+  if curl -s http://localhost:7878/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
+     curl -s http://localhost:8989/api/v3/system/status?apikey=${API_KEY}  2>&1 && \
+     curl -s http://localhost:9696/api/v1/system/status?apikey=${API_KEY}  2>&1; then
     echo "All services ready after $((i * 10)) seconds"
     break
   fi
@@ -61,7 +61,7 @@ for i in $(seq 1 12); do
 done
 
 echo "Testing Radarr..."
-curl -fsS http://localhost:7878/api/v3/system/status?apikey=${API_KEY} >/dev/null && echo "✓ Radarr responding" || {
+curl -s http://localhost:7878/api/v3/system/status?apikey=${API_KEY} && echo "✓ Radarr responding" || {
   echo "✗ Radarr not responding"
   ${CONTAINER_RUNTIME} logs "${CONTAINER}" 2>&1 | head -200 || true
   ${CONTAINER_RUNTIME} rm -f "${CONTAINER}" || true
@@ -69,7 +69,7 @@ curl -fsS http://localhost:7878/api/v3/system/status?apikey=${API_KEY} >/dev/nul
 }
 
 echo "Testing Sonarr..."
-curl -fsS http://localhost:8989/api/v3/system/status?apikey=${API_KEY} >/dev/null && echo "✓ Sonarr responding" || {
+curl -s http://localhost:8989/api/v3/system/status?apikey=${API_KEY} && echo "✓ Sonarr responding" || {
   echo "✗ Sonarr not responding"
   ${CONTAINER_RUNTIME} logs "${CONTAINER}" 2>&1 | head -200 || true
   ${CONTAINER_RUNTIME} rm -f "${CONTAINER}" || true
@@ -77,7 +77,7 @@ curl -fsS http://localhost:8989/api/v3/system/status?apikey=${API_KEY} >/dev/nul
 }
 
 echo "Testing Prowlarr..."
-curl -fsS http://localhost:9696/api/v1/system/status?apikey=${API_KEY} >/dev/null && echo "✓ Prowlarr responding" || {
+curl -s http://localhost:9696/api/v1/system/status?apikey=${API_KEY} && echo "✓ Prowlarr responding" || {
   echo "✗ Prowlarr not responding"
   ${CONTAINER_RUNTIME} logs "${CONTAINER}" 2>&1 | head -200 || true
   ${CONTAINER_RUNTIME} rm -f "${CONTAINER}" || true
