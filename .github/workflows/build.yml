@@ -127,6 +127,9 @@ jobs:
             podman --version
           fi
 
+      - name: Import AMD64 image into Podman
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-amd64:${{ github.sha }}
+
       - name: Test AMD64 image locally
         env:
           CONTAINER_RUNTIME: podman
@@ -191,6 +194,9 @@ jobs:
             sudo apt-get install -y --no-install-recommends podman
             podman --version
           fi
+
+      - name: Import ARM64 image into Podman
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-arm64:${{ github.sha }}
 
       - name: Test ARM64 image locally
         env:
