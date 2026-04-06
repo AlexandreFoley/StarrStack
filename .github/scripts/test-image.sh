@@ -9,14 +9,16 @@ IMAGE="$2"
 # Default API key for testing (from compose.yaml)
 API_KEY="ccf889af356d47bebd03fc30f79b1127"
 
-# Detect container runtime (docker or podman)
-if command -v docker &> /dev/null; then
-  CONTAINER_RUNTIME="docker"
-elif command -v podman &> /dev/null; then
-  CONTAINER_RUNTIME="podman"
-else
-  echo "Error: Neither docker nor podman found"
-  exit 1
+# Detect container runtime (docker or podman); CONTAINER_RUNTIME env var takes precedence
+if [ -z "${CONTAINER_RUNTIME:-}" ]; then
+  if command -v docker &> /dev/null; then
+    CONTAINER_RUNTIME="docker"
+  elif command -v podman &> /dev/null; then
+    CONTAINER_RUNTIME="podman"
+  else
+    echo "Error: Neither docker nor podman found"
+    exit 1
+  fi
 fi
 
 cleanup() {
@@ -38,8 +40,15 @@ fi
 
 mkdir -p "${TEST_BASE_DIR}/config-${CONTAINER}" "${TEST_BASE_DIR}/media-${CONTAINER}"
 
+# Runtime-specific flags for the container run
+RUN_FLAGS=()
+if [ "${CONTAINER_RUNTIME}" = "podman" ]; then
+  RUN_FLAGS+=(--systemd=always --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:rw)
+fi
+
 # NOTE: do NOT use --rm in detached mode; we want logs available if it crashes early.
 ${CONTAINER_RUNTIME} run -d --name "${CONTAINER}" \
+  "${RUN_FLAGS[@]}" \
   -p 7878:7878 \
   -p 8989:8989 \
   -p 9696:9696 \
