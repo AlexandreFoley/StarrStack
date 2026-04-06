@@ -127,6 +127,12 @@ jobs:
             podman --version
           fi
 
+      - name: Import AMD64 image into Podman
+        run: |
+          docker image inspect starrstack-test-amd64:${{ github.sha }} >/dev/null
+          docker save starrstack-test-amd64:${{ github.sha }} | podman load
+          podman image exists starrstack-test-amd64:${{ github.sha }}
+
       - name: Test AMD64 image locally
         env:
           CONTAINER_RUNTIME: podman
@@ -191,6 +197,12 @@ jobs:
             sudo apt-get install -y --no-install-recommends podman
             podman --version
           fi
+
+      - name: Import ARM64 image into Podman
+        run: |
+          docker image inspect starrstack-test-arm64:${{ github.sha }} >/dev/null
+          docker save starrstack-test-arm64:${{ github.sha }} | podman load
+          podman image exists starrstack-test-arm64:${{ github.sha }}
 
       - name: Test ARM64 image locally
         env:
