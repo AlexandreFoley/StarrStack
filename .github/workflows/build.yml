@@ -128,10 +128,7 @@ jobs:
           fi
 
       - name: Import AMD64 image into Podman
-        run: |
-          docker image inspect starrstack-test-amd64:${{ github.sha }} >/dev/null
-          docker save starrstack-test-amd64:${{ github.sha }} | podman load
-          podman image exists starrstack-test-amd64:${{ github.sha }}
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-amd64:${{ github.sha }}
 
       - name: Test AMD64 image locally
         env:
@@ -199,10 +196,7 @@ jobs:
           fi
 
       - name: Import ARM64 image into Podman
-        run: |
-          docker image inspect starrstack-test-arm64:${{ github.sha }} >/dev/null
-          docker save starrstack-test-arm64:${{ github.sha }} | podman load
-          podman image exists starrstack-test-arm64:${{ github.sha }}
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-arm64:${{ github.sha }}
 
       - name: Test ARM64 image locally
         env:
