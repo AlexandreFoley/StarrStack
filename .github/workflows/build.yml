@@ -26,6 +26,8 @@ on:
 jobs:
   versions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       radarr: ${{ steps.versions.outputs.radarr }}
       sonarr: ${{ steps.versions.outputs.sonarr }}
@@ -35,34 +37,36 @@ jobs:
     steps:
       - name: Fetch latest versions
         id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Use provided inputs if available, otherwise fetch latest
           echo "Build versions:"
           if [ -n "${{ github.event.inputs.radarr_version }}" ]; then
             RADARR=${{ github.event.inputs.radarr_version }}
           else
-            RADARR=$(curl -s https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            RADARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Radarr: $RADARR"
           
           if [ -n "${{ github.event.inputs.sonarr_version }}" ]; then
             SONARR=${{ github.event.inputs.sonarr_version }}
           else
-            SONARR=$(curl -s https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            SONARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Sonarr: $SONARR"
           
           if [ -n "${{ github.event.inputs.prowlarr_version }}" ]; then
             PROWLARR=${{ github.event.inputs.prowlarr_version }}
           else
-            PROWLARR=$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            PROWLARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Prowlarr: $PROWLARR"
           
           if [ -n "${{ github.event.inputs.unpackerr_version }}" ]; then
             UNPACKERR=${{ github.event.inputs.unpackerr_version }}
           else
-            UNPACKERR=$(curl -s  https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            UNPACKERR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Unpackerr: $UNPACKERR"
           
