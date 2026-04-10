@@ -7,10 +7,6 @@ on:
         description: 'Push to registry (true/false)'
         required: false
         default: 'false'
-      registry:
-        description: 'Container registry (docker/ghcr)'
-        required: false
-        default: 'ghcr'
       radarr_version:
         description: 'Radarr version (from check workflow)'
         required: false
@@ -97,9 +93,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build AMD64 image
         uses: docker/build-push-action@v5
@@ -164,9 +160,9 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ARM64 image
         id: build
@@ -226,9 +222,9 @@ jobs:
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest
         run: |
