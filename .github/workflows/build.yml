@@ -45,28 +45,28 @@ jobs:
           if [ -n "${{ github.event.inputs.radarr_version }}" ]; then
             RADARR=${{ github.event.inputs.radarr_version }}
           else
-            RADARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            RADARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Radarr: $RADARR"
           
           if [ -n "${{ github.event.inputs.sonarr_version }}" ]; then
             SONARR=${{ github.event.inputs.sonarr_version }}
           else
-            SONARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            SONARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Sonarr: $SONARR"
           
           if [ -n "${{ github.event.inputs.prowlarr_version }}" ]; then
             PROWLARR=${{ github.event.inputs.prowlarr_version }}
           else
-            PROWLARR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            PROWLARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Prowlarr: $PROWLARR"
           
           if [ -n "${{ github.event.inputs.unpackerr_version }}" ]; then
             UNPACKERR=${{ github.event.inputs.unpackerr_version }}
           else
-            UNPACKERR=$(curl -s -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            UNPACKERR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Unpackerr: $UNPACKERR"
           
