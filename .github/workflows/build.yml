@@ -23,6 +23,9 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, edited]
     branches: ["main"]
 
+permissions:
+  contents: read
+  packages: read
 jobs:
   versions:
     runs-on: ubuntu-latest
