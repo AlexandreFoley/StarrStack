@@ -7,10 +7,6 @@ on:
         description: 'Push to registry (true/false)'
         required: false
         default: 'false'
-      registry:
-        description: 'Container registry (docker/ghcr)'
-        required: false
-        default: 'ghcr'
       radarr_version:
         description: 'Radarr version (from check workflow)'
         required: false
@@ -23,10 +19,18 @@ on:
       unpackerr_version:
         description: 'Unpackerr version (from check workflow)'
         required: false
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: ["main"]
 
+permissions:
+  contents: read
+  packages: read
 jobs:
   versions:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       radarr: ${{ steps.versions.outputs.radarr }}
       sonarr: ${{ steps.versions.outputs.sonarr }}
@@ -36,34 +40,36 @@ jobs:
     steps:
       - name: Fetch latest versions
         id: versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Use provided inputs if available, otherwise fetch latest
           echo "Build versions:"
           if [ -n "${{ github.event.inputs.radarr_version }}" ]; then
             RADARR=${{ github.event.inputs.radarr_version }}
           else
-            RADARR=$(curl -s https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            RADARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Radarr/Radarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Radarr: $RADARR"
           
           if [ -n "${{ github.event.inputs.sonarr_version }}" ]; then
             SONARR=${{ github.event.inputs.sonarr_version }}
           else
-            SONARR=$(curl -s https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            SONARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Sonarr/Sonarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Sonarr: $SONARR"
           
           if [ -n "${{ github.event.inputs.prowlarr_version }}" ]; then
             PROWLARR=${{ github.event.inputs.prowlarr_version }}
           else
-            PROWLARR=$(curl -s https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            PROWLARR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Prowlarr: $PROWLARR"
           
           if [ -n "${{ github.event.inputs.unpackerr_version }}" ]; then
             UNPACKERR=${{ github.event.inputs.unpackerr_version }}
           else
-            UNPACKERR=$(curl -s  https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
+            UNPACKERR=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repositories/132426524/releases/latest | jq -r '.tag_name | gsub("^v"; "")')
           fi
           echo "  Unpackerr: $UNPACKERR"
           
@@ -91,12 +97,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build AMD64 image
         uses: docker/build-push-action@v5
@@ -136,7 +142,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-amd64 starrstack-test-amd64:${{ github.sha }}
 
       - name: Push AMD64 image
-        if: github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         run: |
           docker tag starrstack-test-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
@@ -158,12 +164,12 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build ARM64 image
         id: build
@@ -204,7 +210,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-arm64 starrstack-test-arm64:${{ github.sha }}
 
       - name: Push ARM64 image
-        if: github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
         run: |
           docker tag starrstack-test-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
@@ -212,7 +218,7 @@ jobs:
   manifest:
     needs: [versions, build-amd64, build-arm64]
     runs-on: ubuntu-latest
-    if: always() && needs.build-amd64.result == 'success' && github.event.inputs.push == 'true'
+    if: always() && needs.build-amd64.result == 'success' && github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
     permissions:
       contents: write
       packages: write
@@ -223,9 +229,9 @@ jobs:
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ github.event.inputs.registry == 'docker' && 'docker.io' || 'ghcr.io' }}
-          username: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ github.event.inputs.registry == 'docker' && secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest
         run: |
