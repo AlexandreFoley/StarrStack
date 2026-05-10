@@ -1,0 +1,45 @@
+[Unit]
+Description=Starr unified Arr container
+Requires=starrstack-pod.service qbittorrent.service
+After=starrstack-pod.service qbittorrent.service
+
+[Container]
+Image=ghcr.io/alexandrefoley/starrstack:latest
+ContainerName=starr
+Pod=starrstack.pod
+
+Volume=./mounts/config:/config:rw
+Volume=./mounts/media:/media:rw
+
+Environment=RADARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
+Environment=RADARR__AUTH__ENABLED=false
+Environment=RADARR__SERVER__URLBASE=
+Environment=RADARR__SERVER__PORT=7878
+Environment=RADARR__AUTH__METHOD=External
+
+Environment=SONARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
+Environment=SONARR__AUTH__ENABLED=false
+Environment=SONARR__SERVER__URLBASE=
+Environment=SONARR__SERVER__PORT=8989
+Environment=SONARR__AUTH__METHOD=External
+
+Environment=PROWLARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
+Environment=PROWLARR__AUTH__ENABLED=false
+Environment=PROWLARR__SERVER__URLBASE=
+Environment=PROWLARR__SERVER__PORT=9696
+Environment=PROWLARR__AUTH__METHOD=External
+
+Environment=TORRENT_CLIENT=qbittorrent
+Environment=TORRENT_HOST=qbittorrent
+Environment=TORRENT_PORT=8080
+Environment=TORRENT_USERNAME=starruser
+Environment=TORRENT_PASSWORD=use-secrets-instead
+Environment=TORRENT_CATEGORY_MOVIES=radarr
+Environment=TORRENT_CATEGORY_TV=sonarr
+
+[Service]
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target
