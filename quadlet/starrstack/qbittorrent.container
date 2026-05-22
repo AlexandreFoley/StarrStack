@@ -18,7 +18,7 @@ Environment=TZ=Etc/UTC
 Environment=WEBUI_PORTS=8080/tcp
 Environment=LIBTORRENT=v2
 Environment=WEBUI_USERNAME=starruser
-Environment=WEBUI_PASSWORD=use-secrets-instead
+Secret=webui_password,type=env,target=WEBUI_PASSWORD
 
 [Service]
 Restart=always

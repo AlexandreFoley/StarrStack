@@ -11,31 +11,31 @@ Pod=starrstack.pod
 Volume=./mounts/config:/config:rw
 Volume=./mounts/media:/media:rw
 
-Environment=RADARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
 Environment=RADARR__AUTH__ENABLED=false
 Environment=RADARR__SERVER__URLBASE=
 Environment=RADARR__SERVER__PORT=7878
 Environment=RADARR__AUTH__METHOD=External
+Secret=radarr_apikey,type=env,target=RADARR__AUTH__APIKEY
 
-Environment=SONARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
 Environment=SONARR__AUTH__ENABLED=false
 Environment=SONARR__SERVER__URLBASE=
 Environment=SONARR__SERVER__PORT=8989
 Environment=SONARR__AUTH__METHOD=External
+Secret=sonarr_apikey,type=env,target=SONARR__AUTH__APIKEY
 
-Environment=PROWLARR__AUTH__APIKEY=ccf889af356d47bebd03fc30f79b1127
 Environment=PROWLARR__AUTH__ENABLED=false
 Environment=PROWLARR__SERVER__URLBASE=
 Environment=PROWLARR__SERVER__PORT=9696
 Environment=PROWLARR__AUTH__METHOD=External
+Secret=prowlarr_apikey,type=env,target=PROWLARR__AUTH__APIKEY
 
 Environment=TORRENT_CLIENT=qbittorrent
 Environment=TORRENT_HOST=qbittorrent
 Environment=TORRENT_PORT=8080
 Environment=TORRENT_USERNAME=starruser
-Environment=TORRENT_PASSWORD=use-secrets-instead
 Environment=TORRENT_CATEGORY_MOVIES=radarr
 Environment=TORRENT_CATEGORY_TV=sonarr
+Secret=torrent_password,type=env,target=TORRENT_PASSWORD
 
 [Service]
 Restart=always
