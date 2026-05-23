@@ -36,10 +36,10 @@ The container files expect these Podman secrets to exist:
 - `radarr_apikey`
 - `sonarr_apikey`
 - `prowlarr_apikey`
-- `torrent_password`
 - `webui_password`
 
-The three API keys can be generated on the spot with the commands below. For qBittorrent, choose your own username and password, then create the matching secrets with those values.
+The three API keys can be generated on the spot with the commands below. For qBittorrent, choose your password, username is starruser, then create the matching secrets with those values.
+If you choose to change the qbittorrent username, don't forget to change it in both container files.
 
 Create them from stdin, one at a time:
 
@@ -47,7 +47,6 @@ Create them from stdin, one at a time:
 head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n\r' | podman secret create radarr_apikey -
 head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n\r' | podman secret create sonarr_apikey -
 head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n\r' | podman secret create prowlarr_apikey -
-printf '%s' 'your-torrent-password' | podman secret create torrent_password -
 printf '%s' 'your-qbittorrent-webui-password' | podman secret create webui_password -
 ```
 
@@ -64,6 +63,8 @@ systemctl --user start starrstack-pod.service
 The qBittorrent image also supports WireGuard-based VPN settings. For a Private Internet Access setup, follow the same pattern shown in the Hotio WireGuard reference for [qBittorrent](https://hotio.dev/containers/qbittorrent/#wireguard).
 
 If you want qBittorrent to use PIA, add these extra settings to `qbittorrent.container`:
+
+These options go in the `[Container]` section of the file.
 
 ```ini
 HostName=container-name.internal

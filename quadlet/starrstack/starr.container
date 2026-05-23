@@ -35,7 +35,7 @@ Environment=TORRENT_PORT=8080
 Environment=TORRENT_USERNAME=starruser
 Environment=TORRENT_CATEGORY_MOVIES=radarr
 Environment=TORRENT_CATEGORY_TV=sonarr
-Secret=torrent_password,type=env,target=TORRENT_PASSWORD
+Secret=webui_password,type=env,target=TORRENT_PASSWORD
 
 [Service]
 Restart=always
