@@ -59,8 +59,13 @@ fix_mount_permissions() {
     
     if command -v setfacl >/dev/null 2>&1; then
         chmod 700 -R "$config_path"
-        setfacl -R -m u:"$uid":rwx,m::rwx "$config_path"
-        setfacl -R -m d:u:"$uid":rwx,d:m::rwx "$config_path"
+         if setfacl -R -m u:"$uid":rwx,m::rwx "$config_path" && \
+            setfacl -R -m d:u:"$uid":rwx,d:m::rwx "$config_path"; then
+             :
+         else
+             echo "Warning: setfacl failed for $service_name config, falling back to chmod 777."
+             chmod 777 -R "$config_path"
+         fi
     else
         echo "Warning: setfacl not available, falling back to chmod 777 for $service_name config."
         chmod 777 -R "$config_path"
