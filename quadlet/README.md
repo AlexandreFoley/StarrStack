@@ -57,6 +57,10 @@ Start the stack with:
 ```bash
 systemctl --user start starrstack-pod.service
 ```
+## Disabling authentication
+
+Only disable authentication for the arrs if you have an alternative authentication system or if the service are not exposed to the internet.
+
 
 ## Optional qBittorrent VPN Setup
 
