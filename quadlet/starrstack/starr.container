@@ -11,19 +11,19 @@ Pod=starrstack.pod
 Volume=./mounts/config:/config:rw
 Volume=./mounts/media:/media:rw
 
-Environment=RADARR__AUTH__ENABLED=false
+Environment=RADARR__AUTH__ENABLED=true
 Environment=RADARR__SERVER__URLBASE=
 Environment=RADARR__SERVER__PORT=7878
 Environment=RADARR__AUTH__METHOD=External
 Secret=radarr_apikey,type=env,target=RADARR__AUTH__APIKEY
 
-Environment=SONARR__AUTH__ENABLED=false
+Environment=SONARR__AUTH__ENABLED=true
 Environment=SONARR__SERVER__URLBASE=
 Environment=SONARR__SERVER__PORT=8989
 Environment=SONARR__AUTH__METHOD=External
 Secret=sonarr_apikey,type=env,target=SONARR__AUTH__APIKEY
 
-Environment=PROWLARR__AUTH__ENABLED=false
+Environment=PROWLARR__AUTH__ENABLED=true
 Environment=PROWLARR__SERVER__URLBASE=
 Environment=PROWLARR__SERVER__PORT=9696
 Environment=PROWLARR__AUTH__METHOD=External
