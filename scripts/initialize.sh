@@ -57,10 +57,13 @@ fix_mount_permissions() {
     local gid="$3"
     local config_path="/config/$service_name"
     
-    chmod 700 "$config_path"
-    chown "$uid:$gid" "$config_path"
-    find "$config_path" -type d -exec chmod 700 {} \; 2>/dev/null || true
-    find "$config_path" -type f -exec chmod 600 {} \; 2>/dev/null || true
+    if command -v setfacl >/dev/null 2>&1; then
+        setfacl -R -m u:"$uid":rwx,m::rwx "$config_path"
+        setfacl -R -m d:u:"$uid":rwx,d:m::rwx "$config_path"
+    else
+        echo "Warning: setfacl not available, falling back to chmod 777 for $service_name config."
+        chmod 777 "$config_path"
+    fi
 }
 
 
@@ -72,9 +75,6 @@ fix_mount_permissions "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
 
 # /media - world readable/writable for all services
 chmod 777 /media
-chown root:root /media
-find /media -type d -exec chmod 777 {} \; 2>/dev/null || true
-find /media -type f -exec chmod 666 {} \; 2>/dev/null || true
 
 # Create environment file for Unpackerr with dynamic values from arr services
 # This allows Unpackerr to use user-supplied API keys and URLs
