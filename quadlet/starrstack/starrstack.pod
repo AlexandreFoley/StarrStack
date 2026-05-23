@@ -1,0 +1,14 @@
+[Unit]
+Description=StarrStack pod (qBittorrent + Starr services)
+Wants=network-online.target
+After=network-online.target
+
+[Pod]
+PodName=starrstack
+PublishPort=8080:8080
+PublishPort=7878:7878
+PublishPort=8989:8989
+PublishPort=9696:9696
+
+[Install]
+WantedBy=default.target
