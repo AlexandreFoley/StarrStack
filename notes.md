@@ -1,7 +1,5 @@
 - structure:
     - one custom container for sonarr,radarr,prowlarr,etc
-    - one container for buildarr
-        - not needed. the webapi are well documented and llm make working with those a breeze.
     - one container for qbittorrent+VPN
 
 - Image custom pour les *arr:
@@ -22,3 +20,4 @@ Alternative basé sur Alpine pour *arr:
         - les scripts et dockerfile de linuxserver.io devrait formé une bonne base.
         - https://medium.com/@mfranzon/how-to-create-and-manage-a-service-in-an-alpine-linux-container-93a97d5dad80
         - https://stackoverflow.com/questions/78269734/is-there-a-better-way-to-run-openrc-in-a-container-than-enabling-softlevel
+        - dépendence sur setfacl pour gérer les permissions des services sut les dossiers dans config. problème?
