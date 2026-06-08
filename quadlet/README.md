@@ -2,7 +2,7 @@
 
 This directory contains the Quadlet units for StarrStack:
 
-- `starrstack/starrstack.pod`
+- `starrstack/starrstack.network`
 - `starrstack/starr.container`
 - `starrstack/qbittorrent.container`
 
@@ -25,7 +25,7 @@ systemctl --user daemon-reload
 
 The copied units create these services:
 
-- `starrstack-pod.service`
+- `starrstack-network.service`
 - `starr.service`
 - `qbittorrent.service`
 
@@ -55,7 +55,7 @@ If you rotate a secret later, recreate it with `--replace` and restart the affec
 Start the stack with:
 
 ```bash
-systemctl --user start starrstack-pod.service
+systemctl --user start starr.service
 ```
 ## Disabling authentication
 
@@ -64,9 +64,7 @@ Only disable authentication for the arrs if you have an alternative authenticati
 
 ## Optional qBittorrent VPN Setup
 
-The qBittorrent image also supports WireGuard-based VPN settings. For a Private Internet Access setup, follow the same pattern shown in the Hotio WireGuard reference for [qBittorrent](https://hotio.dev/containers/qbittorrent/#wireguard).
-
-If you want qBittorrent to use PIA, add these extra settings to `qbittorrent.container`:
+The qBittorrent container in this topology already includes WireGuard-based VPN settings for a Private Internet Access setup. If you want to change providers or regions, keep the same pattern shown below in `qbittorrent.container`.
 
 These options go in the `[Container]` section of the file.
 
@@ -79,18 +77,11 @@ Environment=VPN_CONF=wg0
 Environment=VPN_PROVIDER=pia
 Environment=VPN_LAN_NETWORK=192.168.0.0/16
 Environment=VPN_LAN_LEAK_ENABLED=false
-Environment=VPN_EXPOSE_PORTS_ON_LAN=
 Environment=VPN_AUTO_PORT_FORWARD=true
-Environment=VPN_PORT_REDIRECTS=
 Environment=VPN_HEALTHCHECK_ENABLED=false
-Environment=VPN_NAMESERVERS=
-Environment=VPN_INTERFACE_PREFIXES=
-Environment=VPN_PIA_PREFERRED_REGION=
-Environment=VPN_PIA_DIP_TOKEN=
 Environment=VPN_PIA_PORT_FORWARD_PERSIST=false
 Environment=PRIVOXY_ENABLED=false
 Environment=UNBOUND_ENABLED=false
-Environment=UNBOUND_NAMESERVERS=
 Secret=pia_user,type=env,target=VPN_PIA_USER
 Secret=pia_pass,type=env,target=VPN_PIA_PASS
 ```
@@ -127,7 +118,7 @@ Description=NAS media mount for StarrStack
 [Mount]
 What=//nas.example.lan/media
 Where=/mnt/media
-Type=cifs
+Type=cifs #smb for samba
 Options=credentials=%h/.config/smb/media.cred,iocharset=utf8,uid=%U,gid=%U,vers=3.1.1
 
 [Install]
@@ -152,7 +143,7 @@ Enable the automount and the quadlet stack:
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now mnt-media.automount
-systemctl --user enable --now starrstack-pod.service
+systemctl --user enable --now starr.service
 ```
 
 With this setup, the NAS is mounted on demand the first time the container accesses `/mnt/media`. That avoids boot-time stalls and keeps the stack usable even when the NAS is briefly offline.
@@ -166,7 +157,7 @@ With this setup, the NAS is mounted on demand the first time the container acces
 
 ## Operational Tips
 
-- Use `journalctl --user -u starrstack-pod.service -f` to follow stack logs.
-- Use `systemctl --user status starr.service qbittorrent.service` to check the generated services.
+- Use `journalctl --user -u starr.service -f` to follow stack logs.
+- Use `systemctl --user status starr.service qbittorrent.service starrstack-network.service` to check the generated services.
 - If a secret changes, recreate it first, then restart the affected unit.
 - If you move the Quadlet folder after installation, run `systemctl --user daemon-reload` again.

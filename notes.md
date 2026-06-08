@@ -12,7 +12,10 @@
         - package_info pour désactivé les mecanisme d'update.
     - l'image de unpackerr fait seulement 8MB, mais installé unpacker dans ubi semble l'avoir fait gonflé de ~40MB.
         - il faut que je vois le dockerfile de leur image.
+        - C'est le processus de checkpointing de la construction du container. 
+            - "multi-stage" regle le problème.
 - QbitTorrent + VPN : https://hotio.dev/containers/qbittorrent/
+    - image ajuster: https://github.com/AlexandreFoley/qbittorrent
 
 Alternative basé sur Alpine pour *arr:
     - Possibilité d'utilisé AplineLinux + OpenRC + systemctl-alpine pour gérer les services. Ça devrait sauvé ~ 250MB à l'image.

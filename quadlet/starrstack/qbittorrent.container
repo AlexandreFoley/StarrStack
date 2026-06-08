@@ -1,15 +1,14 @@
 [Unit]
 Description=qBittorrent container for StarrStack
-Requires=starrstack-pod.service
-After=starrstack-pod.service
 
 [Container]
 Image=ghcr.io/alexandrefoley/qbittorrent
 ContainerName=qbittorrent
-Pod=starrstack.pod
+Network=starrstack.network
+PublishPort=8080:8080
 
-Volume=./mounts/qbittorrent-config:/config:rw
-Volume=./mounts/media:/media:rw
+Volume=./mounts/qbittorrent-config:/config:Z
+Volume=./mounts/media:/media:z
 
 Environment=PUID=1000
 Environment=PGID=1000
@@ -18,7 +17,25 @@ Environment=TZ=Etc/UTC
 Environment=WEBUI_PORTS=8080/tcp
 Environment=LIBTORRENT=v2
 Environment=WEBUI_USERNAME=starruser
+Environment=DOWNLOAD_FOLDER=/media/Torrent
 Secret=webui_password,type=env,target=WEBUI_PASSWORD
+
+# For VPN support, uncomment the following lines and set the appropriate environment variables and secrets.
+# HostName=container-name.internal
+# AddCapability=NET_ADMIN
+
+# Environment=VPN_ENABLED=true
+# Environment=VPN_CONF=wg0
+# Environment=VPN_PROVIDER=pia
+# Environment=VPN_LAN_NETWORK=192.168.0.0/16
+# Environment=VPN_LAN_LEAK_ENABLED=false
+# Environment=VPN_AUTO_PORT_FORWARD=true
+# Environment=VPN_HEALTHCHECK_ENABLED=false
+# Environment=VPN_PIA_PORT_FORWARD_PERSIST=false
+# Environment=PRIVOXY_ENABLED=false
+# Environment=UNBOUND_ENABLED=false
+# Secret=pia_user,type=env,target=VPN_PIA_USER
+# Secret=pia_pass,type=env,target=VPN_PIA_PASS
 
 [Service]
 Restart=always

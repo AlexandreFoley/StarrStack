@@ -1,15 +1,18 @@
 [Unit]
 Description=Starr unified Arr container
-Requires=starrstack-pod.service qbittorrent.service
-After=starrstack-pod.service qbittorrent.service
+Requires=qbittorrent.service
+After=qbittorrent.service
 
 [Container]
 Image=ghcr.io/alexandrefoley/starrstack:latest
 ContainerName=starr
-Pod=starrstack.pod
+Network=starrstack.network
+PublishPort=7878:7878
+PublishPort=8989:8989
+PublishPort=9696:9696
 
-Volume=./mounts/config:/config:rw
-Volume=./mounts/media:/media:rw
+Volume=./mounts/config:/config:Z
+Volume=./mounts/media:/media:z
 
 Environment=RADARR__AUTH__ENABLED=true
 Environment=RADARR__SERVER__URLBASE=
