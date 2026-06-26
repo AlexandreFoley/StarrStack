@@ -64,7 +64,9 @@ Only disable authentication for the arrs if you have an alternative authenticati
 
 ## Optional qBittorrent VPN Setup
 
-The qBittorrent container in this topology already includes WireGuard-based VPN settings for a Private Internet Access setup. If you want to change providers or regions, keep the same pattern shown below in `qbittorrent.container`.
+The qBittorrent container in the quadlets already includes WireGuard-based VPN settings for a Private Internet Access setup. If you want to change providers or regions, keep the same pattern shown below in `qbittorrent.container`.
+
+For more details on VPN (other providers for example), read the documentation for the [base-image](https://hotio.dev/containers/qbittorrent/#wireguard). 
 
 These options go in the `[Container]` section of the file.
 
