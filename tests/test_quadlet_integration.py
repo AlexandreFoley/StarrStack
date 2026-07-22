@@ -35,6 +35,20 @@ def _podman_exec(container, *cmd, timeout=10):
     return _run(full, check=False, timeout=timeout)
 
 
+def _wait_for_url(url, headers=None, timeout_s=120, interval=5):
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            resp = requests.get(url, timeout=5, headers=headers or {},
+                                allow_redirects=True)
+            if resp.ok or resp.status_code == 302:
+                return resp
+        except requests.ConnectionError:
+            pass
+        time.sleep(interval)
+    return None
+
+
 def _ensure_qbittorrent_on_host():
     """Ensure qbittorrent image is available on host podman."""
     result = _run(["podman", "images", "-q", "ghcr.io/alexandrefoley/qbittorrent:latest"])
@@ -48,30 +62,34 @@ def _ensure_qbittorrent_on_host():
 
 @pytest.fixture(scope="module")
 def harness_image():
-    """Build harness image with quadlet files and starr image built in."""
-    import shutil
-    # Copy quadlet files into harness build context
-    quadlet_src = PROJECT_ROOT / "quadlet" / "starrstack"
-    quadlet_dst = HARNESS_DIR / "quadlet"
-    if quadlet_dst.exists():
-        shutil.rmtree(quadlet_dst)
-    shutil.copytree(quadlet_src, quadlet_dst)
-
-    # Copy ubi.dockerfile into harness build context
-    shutil.copy(PROJECT_ROOT / "ubi.dockerfile", HARNESS_DIR)
-
-    _run(["podman", "build", "-t", HARNESS_IMAGE, "."],
-         cwd=HARNESS_DIR, timeout=300)
-
-    # Cleanup
-    shutil.rmtree(quadlet_dst, ignore_errors=True)
-    (HARNESS_DIR / "ubi.dockerfile").unlink(missing_ok=True)
-
+    """Build harness image with quadlet files and starr image built in.
+    
+    Builds using PROJECT_ROOT as context so quadlet files reference the
+    single source of truth in quadlet/starrstack/.
+    """
+    _run([
+        "podman", "build",
+        "-t", HARNESS_IMAGE,
+        "-f", str(HARNESS_DIR / "Dockerfile"),
+        str(PROJECT_ROOT),
+    ], timeout=300)
+    
     yield HARNESS_IMAGE
 
 
+def _poll_until(container, cmd, predicate, timeout_s=60, interval=0.5):
+    """Poll a command inside container until predicate returns True or timeout."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        result = _podman_exec(container, *cmd, timeout=timeout_s)
+        if result.returncode == 0 and predicate(result.stdout):
+            return True
+        time.sleep(interval)
+    return False
+
+
 @pytest.fixture(scope="module")
-def running_harness(harness_image, built_image):
+def running_harness(harness_image):
     """Start a privileged harness with systemd + quadlet files installed."""
     container = f"quadlet-harness-{uuid.uuid4().hex[:8]}"
 
@@ -89,24 +107,31 @@ def running_harness(harness_image, built_image):
             "-p", "9696:9696",
             "-p", "8080:8080",
             harness_image,
-            "bash", "-c", (
-                "while ! systemctl is-system-running 2>/dev/null "
-                "| grep -qE 'running|degraded|maintenance'; do sleep 0.5; done; "
-                "systemctl daemon-reload; "
-                "sleep 2; "
-                "systemctl list-unit-files --type=service; "
-                "sleep infinity"
-            ),
         ], timeout=30)
 
-        # Give systemd time to start
-        time.sleep(10)
+        # Poll for systemd to be ready
+        if not _poll_until(
+            container,
+            ["systemctl", "is-system-running"],
+            lambda out: out.strip() in ("running", "degraded", "maintenance"),
+            timeout_s=60
+        ):
+            pytest.fail("systemd did not reach a stable state within timeout")
 
         # Import qbittorrent image into harness (starr is already built in)
         qbittorrent_save = _run_binary(["podman", "save", "ghcr.io/alexandrefoley/qbittorrent:latest"])
-        qbittorrent_proc = subprocess.Popen(["podman", "load"], stdin=subprocess.PIPE)
-        qbittorrent_proc.communicate(input=qbittorrent_save.stdout, timeout=120)
-        assert qbittorrent_proc.returncode == 0, "Failed to import qbittorrent image"
+        qbittorrent_proc = subprocess.Popen(
+            ["podman", "exec", "-i", container, "podman", "load"],
+            stdin=subprocess.PIPE
+        )
+        try:
+            qbittorrent_proc.communicate(input=qbittorrent_save.stdout, timeout=120)
+        except subprocess.TimeoutExpired:
+            qbittorrent_proc.kill()
+            pytest.fail("Failed to import qbittorrent image within timeout")
+        
+        if qbittorrent_proc.returncode != 0:
+            pytest.fail("Failed to import qbittorrent image")
 
         # Start quadlet services
         _podman_exec(container, "systemctl", "daemon-reload")
@@ -114,8 +139,14 @@ def running_harness(harness_image, built_image):
                       "starr.service", "qbittorrent.service",
                       timeout=30)
 
-        # Wait for containers to come up
-        time.sleep(20)
+        # Poll for containers to appear in podman ps
+        if not _poll_until(
+            container,
+            ["podman", "ps", "--format", "{{.Names}}"],
+            lambda out: "starr" in out and "qbittorrent" in out,
+            timeout_s=60
+        ):
+            pytest.fail("Containers did not start within timeout")
 
         yield container
 
@@ -157,21 +188,8 @@ class TestContainersFromQuadlet:
         result = _podman_exec(running_harness, "podman", "ps", "--format", "{{.Names}}")
         assert "qbittorrent" in result.stdout
 
-    def _wait_for_url(self, url, headers=None, timeout_s=120, interval=5):
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            try:
-                resp = requests.get(url, timeout=5, headers=headers or {},
-                                    allow_redirects=True)
-                if resp.ok or resp.status_code == 302:
-                    return resp
-            except requests.ConnectionError:
-                pass
-            time.sleep(interval)
-        return None
-
     def test_radarr_responds(self, running_harness):
-        resp = self._wait_for_url(
+        resp = _wait_for_url(
             "http://localhost:7878/api/v3/system/status",
             headers={"X-Api-Key": API_KEY},
         )
@@ -179,7 +197,7 @@ class TestContainersFromQuadlet:
         assert resp.ok
 
     def test_sonarr_responds(self, running_harness):
-        resp = self._wait_for_url(
+        resp = _wait_for_url(
             "http://localhost:8989/api/v3/system/status",
             headers={"X-Api-Key": API_KEY},
         )
@@ -187,7 +205,7 @@ class TestContainersFromQuadlet:
         assert resp.ok
 
     def test_prowlarr_responds(self, running_harness):
-        resp = self._wait_for_url(
+        resp = _wait_for_url(
             "http://localhost:9696/api/v1/system/status",
             headers={"X-Api-Key": API_KEY},
         )
@@ -195,5 +213,5 @@ class TestContainersFromQuadlet:
         assert resp.ok
 
     def test_qbittorrent_webui(self, running_harness):
-        resp = self._wait_for_url("http://localhost:8080")
+        resp = _wait_for_url("http://localhost:8080")
         assert resp is not None, "qBittorrent WebUI not reachable on localhost:8080"
