@@ -167,13 +167,13 @@ def running_harness(harness_image):
 # ── Tests ──────────────────────────────────────────────────────────
 
 class TestHarnessSanity:
-    def test_harness_running(self, running_harness):
-        result = _podman_exec(running_harness, "systemctl", "is-system-running")
-        assert result.stdout.strip() in ("running", "degraded", "maintenance")
 
     def test_harness_image_exists(self, harness_image):
         result = _run(["podman", "images", "-q", harness_image], check=False)
         assert result.stdout.strip(), f"Harness image {harness_image} not found"
+    def test_harness_running(self, running_harness):
+        result = _podman_exec(running_harness, "systemctl", "is-system-running")
+        assert result.stdout.strip() in ("running", "degraded", "maintenance")
 
 
 class TestServiceHealthChecks:
@@ -185,23 +185,26 @@ class TestServiceHealthChecks:
                              "http://localhost:8080", timeout=5)
         assert result.returncode == 0, f"qBittorrent health check failed: {result.stderr}"
     
-    def test_radarr_health(self, running_harness):
+    def test_radarr_health(self, running_harness, api_key):
         """Check Radarr API responds."""
         result = _podman_exec(running_harness, "curl", "-s", "-f",
+                             "-H", f"X-Api-Key: {api_key}",
                              "http://localhost:7878/api/v3/system/status",
                              timeout=5)
         assert result.returncode == 0, f"Radarr health check failed: {result.stderr}"
     
-    def test_sonarr_health(self, running_harness):
+    def test_sonarr_health(self, running_harness, api_key):
         """Check Sonarr API responds."""
         result = _podman_exec(running_harness, "curl", "-s", "-f",
+                             "-H", f"X-Api-Key: {api_key}",
                              "http://localhost:8989/api/v3/system/status",
                              timeout=5)
         assert result.returncode == 0, f"Sonarr health check failed: {result.stderr}"
     
-    def test_prowlarr_health(self, running_harness):
+    def test_prowlarr_health(self, running_harness, api_key):
         """Check Prowlarr API responds."""
         result = _podman_exec(running_harness, "curl", "-s", "-f",
+                             "-H", f"X-Api-Key: {api_key}",
                              "http://localhost:9696/api/v1/system/status",
                              timeout=5)
         assert result.returncode == 0, f"Prowlarr health check failed: {result.stderr}"

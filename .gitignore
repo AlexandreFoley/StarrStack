@@ -29,3 +29,4 @@ Thumbs.db
 
 #python
 *.pyc
+.venv

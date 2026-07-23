@@ -32,4 +32,6 @@ RUN systemctl enable service-monitor.service
 COPY tests/harness/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+COPY test_api_key /harness/test_api_key
+
 ENTRYPOINT ["/entrypoint.sh"]
