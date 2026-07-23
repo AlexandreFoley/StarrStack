@@ -17,16 +17,19 @@ RUN useradd -m -s /bin/bash testuser \
 
 # Quadlet files land here (copied from project root quadlet/starrstack/)
 COPY quadlet/starrstack/* /etc/containers/systemd/
-COPY ubi.dockerfile /ubi.dockerfile
-RUN echo "test-api-key-quadlet" > /run/secrets/radarr_apikey
-RUN echo "test-api-key-quadlet" > /run/secrets/sonarr_apikey
-RUN echo "test-api-key-quadlet" > /run/secrets/prowlarr_apikey
-RUN echo "testpass" > /run/secrets/webui_password
+RUN mkdir -p /etc/containers/systemd/mounts
 
-# Build starr image inside the harness with the tag quadlet expects
-RUN podman build -t ghcr.io/alexandrefoley/starrstack:latest -f /ubi.dockerfile /
+# Disable automatic restart on crash for testing
+RUN sed -i 's/Restart=always/Restart=no/' /etc/containers/systemd/*.container
+
+# Copy monitoring script and systemd service
+COPY tests/harness/monitor-services.sh /usr/local/bin/monitor-services.sh
+RUN chmod +x /usr/local/bin/monitor-services.sh
+
+COPY tests/harness/service-monitor.service /etc/systemd/system/service-monitor.service
+RUN systemctl enable service-monitor.service
 
 COPY tests/harness/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT ["/sbin/init"]
+ENTRYPOINT ["/entrypoint.sh"]

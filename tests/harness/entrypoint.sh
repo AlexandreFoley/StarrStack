@@ -1,23 +1,24 @@
 #!/bin/bash
 # Entrypoint for test harness container.
-# Waits for systemd to be ready, then runs the test script if provided.
-set -e
+# Starts systemd as PID 1 for proper systemd/journalctl operation.
+# Service monitoring is handled by systemd service units.
 
-# Wait for systemd to finish initialising
-while ! systemctl is-system-running --wait 2>/dev/null | grep -q "running\|degraded\|maintenance"; do
-    sleep 0.5
-done
+# Create mount point directories for quadlet files
+mkdir -p /etc/containers/systemd/mounts/qbittorrent-config
+mkdir -p /etc/containers/systemd/mounts/config
+mkdir -p /etc/containers/systemd/mounts/media
 
-echo "Systemd ready, processing quadlet files..."
+# Change ownership to the testuser (who runs podman as rootless)
+# This is needed because quadlet will try to access these directories
+chown -R 1000:1000 /etc/containers/systemd/mounts/
 
-# Generate systemd units from quadlet files
-systemctl daemon-reload
+# Create podman secrets with test values
+# These are required by the quadlet container files
+echo "testpass" | podman secret create webui_password - || true
+echo "ccf889af356d47bebd03fc30f79b1127" | podman secret create sonarr_apikey - || true
+echo "ccf889af356d47bebd03fc30f79b1127" | podman secret create radarr_apikey - || true
+echo "ccf889af356d47bebd03fc30f79b1127" | podman secret create prowlarr_apikey - || true
 
-# List what quadlet produced
-echo "=== Generated units ==="
-systemctl list-unit-files --type=service --state=generated 2>/dev/null || true
-
-# If a test command was passed, run it
-if [ $# -gt 0 ]; then
-    exec "$@"
-fi
+# Start systemd as PID 1
+# This allows journalctl and systemd operations to work properly
+exec /sbin/init
