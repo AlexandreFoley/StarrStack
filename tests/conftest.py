@@ -15,7 +15,10 @@ def api_key():
 
 
 def build_image(podman_client: PodmanClient):
-    """Build the image fresh (no cache), streaming output to stdout in real-time."""
+    """Build the image fresh (no cache), streaming output to stdout in real-time.
+    We are using cli command because calling through the sdk gives no easy way to output before the build is completed.
+    It simpler to just call the cli.
+    """
     result = subprocess.run(
         [
             "podman", "build",
@@ -60,6 +63,8 @@ def running_container(podman_client:PodmanClient, built_image):
         podman_client.containers.run(
             built_image,
             detach=True,
+            tty=True,
+            # stdin_open=True,
             name=name,
             ports={"7878/tcp": 7878, "8989/tcp": 8989, "9696/tcp": 9696},
             environment={

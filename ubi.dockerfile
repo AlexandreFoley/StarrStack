@@ -118,6 +118,8 @@ RUN mkdir -p /etc/systemd/system/unpackerr.service.d && \
     cat > /etc/systemd/system/unpackerr.service.d/override.conf <<'EOF'
 [Service]
 PassEnvironment=UN_RADARR_0_API_KEY UN_RADARR_0_URL UN_SONARR_0_API_KEY UN_SONARR_0_URL UN_DEBUG UN_LOG_FILE UN_LOG_LEVEL UN_CHECK_RESTART UN_CHECK_UPDATE UN_START_DELAY UN_STOP_TIMEOUT
+StandardOutput=journal+console
+StandardError=journal+console
 EOF
 
 # Install runtime dependencies and cleanup
@@ -125,7 +127,7 @@ RUN dnf install -y --nodocs libicu sqlite jq && \
     dnf clean all && \
     rm -rf /var/cache/* /var/log/dnf* /var/log/yum.*
 
-RUN systemctl enable sonarr radarr prowlarr unpackerr initialize logging configure-indexers configure-downloadclients
+RUN systemctl enable sonarr radarr prowlarr unpackerr initialize configure-indexers configure-downloadclients
 
 VOLUME ["/config","/media"]
 

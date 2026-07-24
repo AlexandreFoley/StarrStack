@@ -8,6 +8,9 @@ ExecStart=/usr/bin/journalctl -u radarr -u sonarr -u prowlarr -u unpackerr -u co
 Restart=always
 RestartSec=5s
 FailureAction=exit
+StandardOutput=journal+console
+StandardError=journal+console
+
 
 [Install]
 WantedBy=multi-user.target

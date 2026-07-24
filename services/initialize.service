@@ -11,6 +11,8 @@ ExecStart=/usr/local/bin/initialize.sh
 RemainAfterExit=yes
 FailureAction=exit
 PassEnvironment=RADARR__AUTH__APIKEY RADARR__SERVER__PORT RADARR__SERVER__URLBASE SONARR__AUTH__APIKEY SONARR__SERVER__PORT SONARR__SERVER__URLBASE PROWLARR__AUTH__APIKEY PROWLARR__SERVER__PORT PROWLARR__SERVER__URLBASE
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target

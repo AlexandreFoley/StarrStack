@@ -9,6 +9,8 @@ ExecStart=/usr/local/bin/configure-indexers.sh
 RemainAfterExit=yes
 FailureAction=exit
 PassEnvironment=RADARR__SERVER__PORT RADARR__SERVER__URLBASE RADARR__AUTH__APIKEY SONARR__SERVER__PORT SONARR__SERVER__URLBASE SONARR__AUTH__APIKEY PROWLARR__SERVER__PORT PROWLARR__SERVER__URLBASE PROWLARR__AUTH__APIKEY
+StandardOutput=journal+console
+StandardError=journal+console
 
 [Install]
 WantedBy=multi-user.target
