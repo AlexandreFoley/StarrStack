@@ -36,13 +36,25 @@ def podman_client():
 
 @pytest.fixture(scope="session")
 def built_image(podman_client:PodmanClient):
-    """Build image fresh, yield image object."""
+    """Build image fresh, yield image object.
+
+    Equivalent command line:
+    podman build --file ubi.dockerfile --tag starr-test:latest .
+    """
     build_image(podman_client)
     yield podman_client.images.get("starr-test:latest")
 
 @pytest.fixture(scope="session")
 def running_container(podman_client:PodmanClient, built_image):
-    """Start container, yield name, cleanup on exit."""
+    """Start container, yield name, cleanup on exit.
+
+    Equivalent command line:
+    podman run -d --name starr-test-<uuid> -p 7878:7878 -p 8989:8989 -p 9696:9696 \
+      -e RADARR__AUTH__APIKEY=<key> -e RADARR__SERVER__PORT=7878 \
+      -e SONARR__AUTH__APIKEY=<key> -e SONARR__SERVER__PORT=8989 \
+      -e PROWLARR__AUTH__APIKEY=<key> -e PROWLARR__SERVER__PORT=9696 \
+      --systemd=true starr-test:latest
+    """
     name = f"starr-test-{uuid.uuid4()}"
     podman_client.containers.run(
         built_image,

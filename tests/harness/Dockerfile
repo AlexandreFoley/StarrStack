@@ -10,19 +10,19 @@ RUN dnf install -y --nodocs --allowerasing \
         skopeo \
     && dnf clean all
 
-# Rootless podman needs a user with a home and subuids/subgids
 RUN useradd -m -s /bin/bash testuser \
     && echo "testuser:100000:65536" >> /etc/subuid \
     && echo "testuser:100000:65536" >> /etc/subgid
 
-# Quadlet files land here (copied from project root quadlet/starrstack/)
+# Import starr image built on host and saved as tar
+COPY starr-image.tar /starr-image.tar
+RUN podman load -i /starr-image.tar
+
 COPY quadlet/starrstack/* /etc/containers/systemd/
 RUN mkdir -p /etc/containers/systemd/mounts
 
-# Disable automatic restart on crash for testing
 RUN sed -i 's/Restart=always/Restart=no/' /etc/containers/systemd/*.container
 
-# Copy monitoring script and systemd service
 COPY tests/harness/monitor-services.sh /usr/local/bin/monitor-services.sh
 RUN chmod +x /usr/local/bin/monitor-services.sh
 

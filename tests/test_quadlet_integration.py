@@ -73,7 +73,13 @@ def _poll_until(container, cmd, predicate, timeout_s=60, interval=0.5):
 
 @pytest.fixture(scope="module")
 def running_harness(harness_image):
-    """Start a privileged harness with systemd + quadlet files installed."""
+    """Start a privileged harness with systemd + quadlet files installed.
+
+    Equivalent command line:
+    podman run -d --name quadlet-harness-<uuid> --privileged \
+      -p 7878:7878 -p 8989:8989 -p 9696:9696 -p 8080:8080 \
+      starr-quadlet-harness:latest
+    """
     container = f"quadlet-harness-{uuid.uuid4().hex[:8]}"
 
     try:
@@ -108,18 +114,7 @@ def running_harness(harness_image):
         ):
             pytest.fail("systemd did not reach a stable state within timeout")
 
-        # Pull images inside the container instead of importing
-        print("Pulling starr image inside container...")
-        starr_pull = _podman_exec(container, "podman", "pull", "ghcr.io/alexandrefoley/starrstack:latest", timeout=300)
-        if "Error" in starr_pull.stderr or starr_pull.returncode != 0:
-            pytest.fail(f"Failed to pull starr image: {starr_pull.stderr}")
-        
-        print("Pulling qbittorrent image inside container...")
-        qbit_pull = _podman_exec(container, "podman", "pull", "ghcr.io/alexandrefoley/qbittorrent:latest", timeout=300)
-        if "Error" in qbit_pull.stderr or qbit_pull.returncode != 0:
-            pytest.fail(f"Failed to pull qbittorrent image: {qbit_pull.stderr}")
-
-        # Start quadlet services (systemd will handle dependencies automatically)
+        # Start quadlet services (systemd will pull images automatically if not present)
         _podman_exec(container, "systemctl", "daemon-reload")
         _podman_exec(container, "systemctl", "start",
                       "starr.service", "qbittorrent.service",
