@@ -6,7 +6,7 @@ from podman import PodmanClient
 # Read API key from test_api_key file
 _env_file = __import__("pathlib").Path(__file__).resolve().parent.parent / "test_api_key"
 _API = dict(line.split("=", 1) for line in open(_env_file) if "=" in line and not line.startswith("#"))
-API_KEY = _API["API_KEY"]
+API_KEY = _API["API_KEY"].strip()
 
 
 @pytest.fixture(scope="session")
@@ -48,7 +48,7 @@ def built_image(podman_client:PodmanClient):
     yield podman_client.images.get("starr-test:latest")
 
 @pytest.fixture(scope="session")
-def running_container(podman_client:PodmanClient, built_image):
+def running_container(podman_client:PodmanClient, built_image, api_key):
     """Start container, yield name, cleanup on exit.
 
     Equivalent command line:
@@ -68,16 +68,20 @@ def running_container(podman_client:PodmanClient, built_image):
             name=name,
             ports={"7878/tcp": 7878, "8989/tcp": 8989, "9696/tcp": 9696},
             environment={
-                "RADARR__AUTH__APIKEY": API_KEY,
+                "RADARR__AUTH__APIKEY": api_key,
                 "RADARR__SERVER__PORT": "7878",
-                "SONARR__AUTH__APIKEY": API_KEY,
+                "SONARR__AUTH__APIKEY": api_key,
                 "SONARR__SERVER__PORT": "8989",
-                "PROWLARR__AUTH__APIKEY": API_KEY,
+                "PROWLARR__AUTH__APIKEY": api_key,
                 "PROWLARR__SERVER__PORT": "9696",
             },
             systemd="true",
         )
         yield name
     finally:
-        podman_client.containers.get(name).stop()
-        podman_client.containers.get(name).remove()
+        subprocess.run(
+            ["podman", "rm", "-f", name],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )

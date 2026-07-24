@@ -4,7 +4,6 @@ import socket
 import requests
 import pytest
 
-API_KEY = "ccf889af356d47bebd03fc30f79b1127"
 REQUIRED_PORTS = (7878, 8989, 9696)
 
 
@@ -45,22 +44,6 @@ def test_container_running(running_container):
     """Container should be running after fixture setup."""
     assert running_container is not None
 
-def test_radarr_health(running_container):
-    """Radarr should respond to health check within timeout."""
-    url = f"http://localhost:7878/api/v3/system/status?apikey={API_KEY}"
-    assert wait_for_service(url), "Radarr did not respond within 120s"
-
-def test_sonarr_health(running_container):
-    """Sonarr should respond to health check within timeout."""
-    url = f"http://localhost:8989/api/v3/system/status?apikey={API_KEY}"
-    assert wait_for_service(url), "Sonarr did not respond within 120s"
-
-def test_prowlarr_health(running_container):
-    """Prowlarr should respond to health check within timeout."""
-    url = f"http://localhost:9696/api/v1/system/status?apikey={API_KEY}"
-    assert wait_for_service(url), "Prowlarr did not respond within 120s"
-
-
 def test_starr_container_has_logs(running_container):
     """The starr container should emit at least some logs."""
     deadline = time.time() + 30
@@ -79,3 +62,20 @@ def test_starr_container_has_logs(running_container):
         pytest.fail("starr container produced no logs within 30s")
 
     assert logs
+
+def test_radarr_health(running_container, api_key):
+    """Radarr should respond to health check within timeout."""
+    url = f"http://localhost:7878/api/v3/system/status?apikey={api_key}"
+    assert wait_for_service(url), "Radarr did not respond within 120s"
+
+def test_sonarr_health(running_container, api_key):
+    """Sonarr should respond to health check within timeout."""
+    url = f"http://localhost:8989/api/v3/system/status?apikey={api_key}"
+    assert wait_for_service(url), "Sonarr did not respond within 120s"
+
+def test_prowlarr_health(running_container, api_key):
+    """Prowlarr should respond to health check within timeout."""
+    url = f"http://localhost:9696/api/v1/system/status?apikey={api_key}"
+    assert wait_for_service(url), "Prowlarr did not respond within 120s"
+
+
