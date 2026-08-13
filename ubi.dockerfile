@@ -95,6 +95,11 @@ RUN useradd --system --no-create-home --gid unpackerr unpackerr
 
 # Copy consolidated applications from consolidator stage
 COPY --from=consolidator /opt /opt
+# Services only need read+execute here (updates are UpdateMethod=External).
+# Normalize explicitly: buildah root-owns COPY --from output, but BuildKit
+# preserves builder ownership (where all of /opt ends up sonarr:sonarr 775).
+# go-w also matters because services run with Group=root for /media sharing.
+RUN chown -R root:root /opt && chmod -R u=rwX,go=rX /opt
 COPY --from=consolidator /usr/bin/unpackerr /usr/bin/unpackerr
 COPY --from=consolidator /etc/systemd/system /etc/systemd/system
 COPY --from=consolidator /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service

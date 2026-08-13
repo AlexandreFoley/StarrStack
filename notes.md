@@ -25,3 +25,7 @@ Alternative basé sur Alpine pour *arr:
         - https://medium.com/@mfranzon/how-to-create-and-manage-a-service-in-an-alpine-linux-container-93a97d5dad80
         - https://stackoverflow.com/questions/78269734/is-there-a-better-way-to-run-openrc-in-a-container-than-enabling-softlevel
         - dépendence sur setfacl pour gérer les permissions des services sut les dossiers dans config. problème?
+
+## TODO
+
+- [ ] Verify whether unpackerr actually uses /config/unpackerr (its config lives at /opt/unpackerr.conf). If not make sure it uses /config for its configuration. non-urgent as unpacker should work without further conf.

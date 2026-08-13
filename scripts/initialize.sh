@@ -29,55 +29,18 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     exit 1
 fi
 
-echo "Initializing container..."
-
-# Create directories if they don't exist
+# Create directories if they don't exist (fresh bind mounts)
 mkdir -p /config /media
 mkdir -p /config/radarr /config/sonarr /config/prowlarr /config/unpackerr
-mkdir -p /etc/systemd/system.d
 
-# /config base - readable only by root
-chmod 755 /config
-chown root:root /config
-
-# Get actual UIDs/GIDs from the system
-RADARR_UID=$(id -u radarr 2>/dev/null || echo 100)
-RADARR_GID=$(id -g radarr 2>/dev/null || echo 100)
-SONARR_UID=$(id -u sonarr 2>/dev/null || echo 101)
-SONARR_GID=$(id -g sonarr 2>/dev/null || echo 101)
-PROWLARR_UID=$(id -u prowlarr 2>/dev/null || echo 102)
-PROWLARR_GID=$(id -g prowlarr 2>/dev/null || echo 102)
-UNPACKERR_UID=$(id -u unpackerr 2>/dev/null || echo 103)
-UNPACKERR_GID=$(id -g unpackerr 2>/dev/null || echo 103)
-
-# Function to fix permissions for a service config directory
-fix_mount_permissions() {
-    local service_name="$1"
-    local uid="$2"
-    local gid="$3"
-    local config_path="/config/$service_name"
-    
-    if command -v setfacl >/dev/null 2>&1; then
-        chmod 700 -R "$config_path"
-         if setfacl -R -m u:"$uid":rwx,m::rwx "$config_path" && \
-            setfacl -R -m d:u:"$uid":rwx,d:m::rwx "$config_path"; then
-             :
-         else
-             echo "Warning: setfacl failed for $service_name config, falling back to chmod 777."
-             chmod 777 -R "$config_path"
-         fi
-    else
-        echo "Warning: setfacl not available, falling back to chmod 777 for $service_name config."
-        chmod 777 -R "$config_path"
-    fi
-}
-
-
-# Fix each service's config directory
-fix_mount_permissions "radarr" "$RADARR_UID" "$RADARR_GID"
-fix_mount_permissions "sonarr" "$SONARR_UID" "$SONARR_GID"
-fix_mount_permissions "prowlarr" "$PROWLARR_UID" "$PROWLARR_GID"
-fix_mount_permissions "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
+# Each service owns its config directory; other services are shut out at the
+# top dir (700). Unconditional: config trees are small, and this self-heals
+# strays (root-owned files from restores or one-off root runs). A failed chown
+# warns instead of silently downgrading isolation.
+for svc in radarr sonarr prowlarr unpackerr; do
+    chown -R "$svc:$svc" "/config/$svc" && chmod 700 "/config/$svc" \
+        || echo "Warning: could not set ownership on /config/$svc"
+done
 
 # /media is never modified from inside the container. Services share it through
 # the host user's group: units run with Group=root, which rootless Podman maps to
@@ -101,17 +64,14 @@ Environment="UN_SONARR_0_API_KEY=${SONARR__AUTH__APIKEY}"
 Environment="UN_SONARR_0_URL=http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
 EOF
 
-chmod 644 /etc/systemd/system/unpackerr.service.d/environment.conf
+# Root-only: contains the Radarr and Sonarr API keys. systemd (PID 1) reads
+# drop-ins regardless; services receive the values via their environment.
+chmod 600 /etc/systemd/system/unpackerr.service.d/environment.conf
 
 # Reload systemd to pick up the new service configuration
 systemctl daemon-reload
 
 echo "Initialization complete:"
-echo "  ✓ /config permissions set (service isolation)"
-echo "  ✓ /config/radarr (700) - radarr owned"
-echo "  ✓ /config/sonarr (700) - sonarr owned"
-echo "  ✓ /config/prowlarr (700) - prowlarr owned"
-echo "  ✓ /config/unpackerr (700) - unpackerr owned"
+echo "  ✓ /config service directories owned per-service (700, isolated)"
 echo "  ✓ Unpackerr environment configured from arr service settings"
-echo "  ✓ Environment files created for all services"
 
