@@ -192,10 +192,7 @@ Description=${app^} Daemon
 After=syslog.target network.target
 [Service]
 User=$app_uid
-# ponytail: Group=root rides the rootless mapping (host user's group = container
-gid 0), letting all services share /media with zero host-side changes. Rootful
-bind mounts would need a real GID mapping instead (unimplemented, YAGNI).
-Group=root
+Group=$app_guid
 UMask=$app_umask
 Type=simple
 ExecStart=$bindir/$app_bin -nobrowser -data=$datadir
