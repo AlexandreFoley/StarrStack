@@ -18,6 +18,7 @@
     - image ajuster: https://github.com/AlexandreFoley/qbittorrent
 
 Alternative basé sur Alpine pour *arr:
+    - Supervisord pour gérer plusieur services sans systemd.
     - Possibilité d'utilisé AplineLinux + OpenRC + systemctl-alpine pour gérer les services. Ça devrait sauvé ~ 250MB à l'image.
         - OpenRC est le point d'entré dans ce cas, je crois.
         - les scripts et dockerfile de linuxserver.io devrait formé une bonne base.

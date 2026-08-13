@@ -116,6 +116,10 @@ RUN chmod +x /usr/local/bin/configure-indexers.sh /usr/local/bin/configure-downl
 RUN mkdir -p /etc/systemd/system/unpackerr.service.d && \
     cat > /etc/systemd/system/unpackerr.service.d/override.conf <<'EOF'
 [Service]
+# Same shared-media scheme as the arr units: group 0 = host user's group (rootless),
+# umask 002 keeps extracted files group-writable.
+Group=root
+UMask=0002
 PassEnvironment=UN_RADARR_0_API_KEY UN_RADARR_0_URL UN_SONARR_0_API_KEY UN_SONARR_0_URL UN_DEBUG UN_LOG_FILE UN_LOG_LEVEL UN_CHECK_RESTART UN_CHECK_UPDATE UN_START_DELAY UN_STOP_TIMEOUT
 StandardOutput=journal+console
 StandardError=journal+console

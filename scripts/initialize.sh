@@ -79,8 +79,17 @@ fix_mount_permissions "sonarr" "$SONARR_UID" "$SONARR_GID"
 fix_mount_permissions "prowlarr" "$PROWLARR_UID" "$PROWLARR_GID"
 fix_mount_permissions "unpackerr" "$UNPACKERR_UID" "$UNPACKERR_GID"
 
-# /media - world readable/writable for all services
-chmod 777 -R /media
+# /media is never modified from inside the container. Services share it through
+# the host user's group: units run with Group=root, which rootless Podman maps to
+# the host user's primary group. Requirement: a group-writable tree (umask 002).
+# Probe once as a service user and warn loudly instead of failing the boot.
+if runuser -u radarr -g root -- sh -c '[ -r /media ] && [ -w /media ] && [ -x /media ]' 2>/dev/null; then
+    echo "  ✓ /media is group-writable (shared via host user's group)"
+else
+    echo "  *** WARNING: services cannot write to /media."
+    echo "  *** The media tree must be group-writable (664/775) by your host group."
+    echo "  *** Use UMASK=002 on your download client (the qbittorrent unit already does)."
+fi
 
 # Create environment file for Unpackerr with dynamic values from arr services
 # This allows Unpackerr to use user-supplied API keys and URLs
@@ -103,7 +112,6 @@ echo "  ✓ /config/radarr (700) - radarr owned"
 echo "  ✓ /config/sonarr (700) - sonarr owned"
 echo "  ✓ /config/prowlarr (700) - prowlarr owned"
 echo "  ✓ /config/unpackerr (700) - unpackerr owned"
-echo "  ✓ /media permissions set (777 - world accessible)"
 echo "  ✓ Unpackerr environment configured from arr service settings"
 echo "  ✓ Environment files created for all services"
 

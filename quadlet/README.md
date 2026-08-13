@@ -107,6 +107,10 @@ Volume=/mnt/media:/media:rw
 
 This is the better option when the media storage lives on a NAS or other network-backed filesystem. Keep the container bind mount pointed at a stable local mountpoint, and let `systemd` handle the remote filesystem mount underneath it.
 
+### Media Permissions
+
+The container never modifies `/media` from inside. Services share it through your own group: the units run with `Group=root`, which rootless Podman maps to your host primary group. The requirement is a **group-writable tree** (`664`/`775`, i.e. umask `002` — the qbittorrent unit already sets `UMASK=002`). If imports fail, check `journalctl --user -u initialize.service` for the writability warning. For CIFS/NFS mounts, set the modes explicitly in the mount options (e.g. add `file_mode=0664,dir_mode=0775` to the CIFS example below).
+
 ### NAS Example With `systemd` Mounts
 
 Use a dedicated mountpoint such as `/mnt/media` and create matching user units:

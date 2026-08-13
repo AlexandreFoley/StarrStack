@@ -75,3 +75,18 @@ def test_prowlarr_health(running_container, api_key):
     assert wait_for_service(url), "Prowlarr did not respond within 120s"
 
 
+def test_services_run_with_shared_media_group(running_container):
+    """All services must run with primary gid 0 so /media sharing works via the
+    host user's group (rootless maps host group to container gid 0) without the
+    container ever modifying the media tree."""
+    result = subprocess.run(
+        ["podman", "exec", running_container, "sh", "-c",
+         "for p in /proc/[0-9]*; do c=$(cat $p/comm 2>/dev/null); "
+         "case $c in Radarr|Sonarr|Prowlarr|unpackerr) "
+         "awk '/^Gid:/{print $2}' $p/status;; esac; done"],
+        capture_output=True, text=True, check=False,
+    )
+    gids = result.stdout.split()
+    assert len(gids) == 4 and all(g == "0" for g in gids), f"service primary gids: {gids}"
+
+
