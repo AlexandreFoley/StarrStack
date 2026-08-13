@@ -3,18 +3,12 @@ import uuid
 import pytest
 from podman import PodmanClient
 
-# Read API key from test_api_key file
-_env_file = __import__("pathlib").Path(__file__).resolve().parent.parent / "test_api_key"
-_API = dict(line.split("=", 1) for line in open(_env_file) if "=" in line and not line.startswith("#"))
-API_KEY = _API["API_KEY"].strip()
-
-
 @pytest.fixture(scope="session")
 def api_key():
-    return API_KEY
+    return uuid.uuid4().hex
 
 
-def build_image(podman_client: PodmanClient):
+def build_image():
     """Build the image fresh (no cache), streaming output to stdout in real-time.
     We are using cli command because calling through the sdk gives no easy way to output before the build is completed.
     It simpler to just call the cli.
@@ -24,8 +18,6 @@ def build_image(podman_client: PodmanClient):
             "podman", "build",
             "--file", "ubi.dockerfile",
             "--tag", "starr-test:latest",
-            # "--no-cache",
-            # "--rm=false",
             ".",
         ],
     )
@@ -44,7 +36,7 @@ def built_image(podman_client:PodmanClient):
     Equivalent command line:
     podman build --file ubi.dockerfile --tag starr-test:latest .
     """
-    build_image(podman_client)
+    build_image()
     yield podman_client.images.get("starr-test:latest")
 
 @pytest.fixture(scope="session")

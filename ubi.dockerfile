@@ -103,7 +103,6 @@ COPY config/unpackerr.conf /opt/unpackerr.conf
 # Copy permission fix script and service
 COPY scripts/initialize.sh /usr/local/bin/initialize.sh
 COPY services/initialize.service /etc/systemd/system/initialize.service
-COPY services/logging.service /etc/systemd/system/logging.service
 RUN chmod +x /usr/local/bin/initialize.sh
 
 # Copy configuration scripts and services

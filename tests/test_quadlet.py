@@ -116,18 +116,6 @@ def _container_names() -> dict[str, str]:
     return result
 
 
-def _secret_refs() -> dict[str, list[str]]:
-    result = {}
-    for p in CONTAINER_FILES:
-        sections = parse_quadlet(p)
-        secrets = []
-        for key, val in sections.get("Container", []):
-            if key.lower() == "secret":
-                secrets.append(val.split(",")[0].strip())
-        result[p.name] = secrets
-    return result
-
-
 class TestCrossReferences:
     def test_network_references_exist(self):
         container_nets = _container_network_names()
@@ -138,7 +126,12 @@ class TestCrossReferences:
             )
 
     def test_no_duplicate_network_names(self):
-        names = list(_network_names())
+        names = []
+        for p in sorted(QUADLET_DIR.glob("*.network")):
+            sections = parse_quadlet(p)
+            nn = _get_first(sections, "Network", "NetworkName")
+            if nn:
+                names.append(nn)
         assert len(names) == len(set(names)), f"Duplicate NetworkName: {names}"
 
     def test_no_duplicate_container_names(self):

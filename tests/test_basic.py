@@ -40,10 +40,6 @@ def test_required_ports_available():
         "Stop the conflicting service(s) and re-run tests."
     )
 
-def test_container_running(running_container):
-    """Container should be running after fixture setup."""
-    assert running_container is not None
-
 def test_starr_container_has_logs(running_container):
     """The starr container should emit at least some logs."""
     deadline = time.time() + 30
