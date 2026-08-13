@@ -17,7 +17,7 @@ FROM builder-base AS radarr-builder
 ARG RADARR_VERSION
 RUN echo "Building Radarr ${RADARR_VERSION}"
 RUN groupadd radarr
-RUN bash arrstack-install.sh radarr radarr radarr
+RUN bash arrstack-install.sh radarr radarr root
 RUN rm -rf /opt/Radarr/Radarr.Update
 
 # Stage 3: Download and build Sonarr
@@ -25,7 +25,7 @@ FROM builder-base AS sonarr-builder
 ARG SONARR_VERSION
 RUN echo "Building Sonarr ${SONARR_VERSION}"
 RUN groupadd sonarr
-RUN bash arrstack-install.sh sonarr sonarr sonarr
+RUN bash arrstack-install.sh sonarr sonarr root
 RUN rm -rf /opt/Sonarr/Sonarr.Update
 
 # Stage 4: Download and build Prowlarr
@@ -33,7 +33,7 @@ FROM builder-base AS prowlarr-builder
 ARG PROWLARR_VERSION
 RUN echo "Building Prowlarr ${PROWLARR_VERSION}"
 RUN groupadd prowlarr
-RUN bash arrstack-install.sh prowlarr prowlarr prowlarr
+RUN bash arrstack-install.sh prowlarr prowlarr root
 RUN rm -rf /opt/Prowlarr/Prowlarr.Update
 
 # Stage 5: Download and build Unpackerr
@@ -95,6 +95,11 @@ RUN useradd --system --no-create-home --gid unpackerr unpackerr
 
 # Copy consolidated applications from consolidator stage
 COPY --from=consolidator /opt /opt
+# Services only need read+execute here (updates are UpdateMethod=External).
+# Normalize explicitly: buildah root-owns COPY --from output, but BuildKit
+# preserves builder ownership (where all of /opt ends up sonarr:sonarr 775).
+# go-w also matters because services run with Group=root for /media sharing.
+RUN chown -R root:root /opt && chmod -R u=rwX,go=rX /opt
 COPY --from=consolidator /usr/bin/unpackerr /usr/bin/unpackerr
 COPY --from=consolidator /etc/systemd/system /etc/systemd/system
 COPY --from=consolidator /usr/lib/systemd/system/unpackerr.service /usr/lib/systemd/system/unpackerr.service
@@ -116,6 +121,10 @@ RUN chmod +x /usr/local/bin/configure-indexers.sh /usr/local/bin/configure-downl
 RUN mkdir -p /etc/systemd/system/unpackerr.service.d && \
     cat > /etc/systemd/system/unpackerr.service.d/override.conf <<'EOF'
 [Service]
+# Same shared-media scheme as the arr units: group 0 = host user's group (rootless),
+# umask 002 keeps extracted files group-writable.
+Group=root
+UMask=0002
 PassEnvironment=UN_RADARR_0_API_KEY UN_RADARR_0_URL UN_SONARR_0_API_KEY UN_SONARR_0_URL UN_DEBUG UN_LOG_FILE UN_LOG_LEVEL UN_CHECK_RESTART UN_CHECK_UPDATE UN_START_DELAY UN_STOP_TIMEOUT
 StandardOutput=journal+console
 StandardError=journal+console

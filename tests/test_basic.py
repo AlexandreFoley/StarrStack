@@ -75,3 +75,69 @@ def test_prowlarr_health(running_container, api_key):
     assert wait_for_service(url), "Prowlarr did not respond within 120s"
 
 
+def test_services_run_with_shared_media_group(running_container):
+    """All services must run with primary gid 0 so /media sharing works via the
+    host user's group (rootless maps host group to container gid 0) without the
+    container ever modifying the media tree."""
+    result = subprocess.run(
+        ["podman", "exec", running_container, "sh", "-c",
+         "for p in /proc/[0-9]*; do c=$(cat $p/comm 2>/dev/null); "
+         "case $c in Radarr|Sonarr|Prowlarr|unpackerr) "
+         "awk '/^Gid:/{print $2}' $p/status;; esac; done"],
+        capture_output=True, text=True, check=False,
+    )
+    gids = result.stdout.split()
+    assert len(gids) == 4 and all(g == "0" for g in gids), f"service primary gids: {gids}"
+
+
+def test_config_dirs_owned_and_isolated(running_container):
+    """Each /config/<svc> must be owned by its service with mode 700, and other
+    services must not be able to enter it — even with the shared gid 0 that
+    /media sharing grants them."""
+    result = subprocess.run(
+        ["podman", "exec", running_container, "stat", "-c", "%n %U %a",
+         "/config/radarr", "/config/sonarr", "/config/prowlarr", "/config/unpackerr"],
+        capture_output=True, text=True, check=True,
+    )
+    for line, svc in zip(result.stdout.splitlines(),
+                         ["radarr", "sonarr", "prowlarr", "unpackerr"]):
+        assert line == f"/config/{svc} {svc} 700", line
+    probe = subprocess.run(
+        ["podman", "exec", running_container,
+         "runuser", "-u", "sonarr", "-g", "root", "--", "test", "-x", "/config/radarr"],
+        capture_output=True, check=False,
+    )
+    assert probe.returncode != 0, "sonarr could traverse /config/radarr — isolation broken"
+
+
+def test_opt_root_owned_not_group_writable(running_container):
+    """/opt must be root-owned with no group/other write anywhere: services run
+    with primary gid 0, so any group-writable file under /opt would be
+    service-writable. Also guards the BuildKit backend, which preserves the
+    builder stages' (wrong) ownership instead of resetting to root."""
+    result = subprocess.run(
+        ["podman", "exec", running_container, "stat", "-c", "%n %U %G %a",
+         "/opt/Radarr", "/opt/Sonarr", "/opt/Prowlarr"],
+        capture_output=True, text=True, check=True,
+    )
+    for line, d in zip(result.stdout.splitlines(), ["Radarr", "Sonarr", "Prowlarr"]):
+        assert line == f"/opt/{d} root root 755", line
+    writable = subprocess.run(
+        ["podman", "exec", running_container, "sh", "-c",
+         "find /opt \\( -type f -o -type d \\) -perm /022"],
+        capture_output=True, text=True, check=True,
+    )
+    assert not writable.stdout.strip(), f"writable paths under /opt:\n{writable.stdout[:500]}"
+
+
+def test_unpackerr_environment_file_root_only(running_container):
+    """environment.conf holds the Radarr/Sonarr API keys; only root (systemd)
+    may read it. Services receive the values through their environment."""
+    result = subprocess.run(
+        ["podman", "exec", running_container, "stat", "-c", "%U %a",
+         "/etc/systemd/system/unpackerr.service.d/environment.conf"],
+        capture_output=True, text=True, check=True,
+    )
+    assert result.stdout.strip() == "root 600", result.stdout
+
+
