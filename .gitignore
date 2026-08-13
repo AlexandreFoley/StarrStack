@@ -24,3 +24,8 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+#python
+*.pyc
+.venv
+test_api_key

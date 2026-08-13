@@ -7,6 +7,7 @@ After=qbittorrent.service
 Image=ghcr.io/alexandrefoley/starrstack:latest
 ContainerName=starr
 Network=starrstack.network
+TTY=true
 PublishPort=7878:7878
 PublishPort=8989:8989
 PublishPort=9696:9696

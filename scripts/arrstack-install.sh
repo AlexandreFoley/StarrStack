@@ -200,6 +200,8 @@ TimeoutStopSec=20
 KillMode=process
 Restart=on-failure
 PassEnvironment=$pass_env
+StandardOutput=journal+console
+StandardError=journal+console
 [Install]
 WantedBy=multi-user.target
 EOF

@@ -1,11 +1,10 @@
 
 services:
   starr:
-    image: ubi:latest
+    image: localhost/starr-test:latest
     container_name: starr
     restart: unless-stopped
     tty: true
-    stdin_open: true
     
     # Port mappings
     ports:
