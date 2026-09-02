@@ -11,9 +11,8 @@ FROM alpine:3.24 AS builder-base
 ARG TARGETARCH
 
 # TARGETARCH is fixed for the whole build, so validate it once here instead of
-# in every stage that downloads an arch-specific asset. The binding constraint
-# is systemctl-alpine (prebuilt binaries exist for amd64 and arm64); that set
-# also covers the unpackerr asset names.
+# in every stage that downloads an arch-specific asset (the unpackerr release
+# names use it directly).
 # GNU wget: busybox wget has no --content-disposition (arrstack-install.sh needs it)
 RUN apk add --no-cache bash wget && mkdir -p /etc/systemd/system && \
     case "$TARGETARCH" in \
@@ -45,25 +44,26 @@ RUN echo "Building Prowlarr ${PROWLARR_VERSION}" && \
     rm -rf /opt/Prowlarr/Prowlarr.Update
 
 # Stage 5: Download and build Unpackerr (static Go binary; no Alpine package exists).
-# Asset names use TARGETARCH directly; TARGETARCH is validated once in builder-base.
+# Asset naming is unpackerr_<ver>_linux_<arch>.tar.gz (changed in v0.16; the
+# old unpackerr.<arch>.linux.gz only existed up to 0.15.x). The release ships
+# checksums.sha256.txt - verify the archive against it (moving-target integrity).
 FROM alpine:3.24 AS unpackerr-builder
 ARG UNPACKERR_VERSION
 ARG TARGETARCH
 RUN apk add --no-cache curl && \
-    curl -fsSL -o /tmp/unpackerr.gz \
-      "https://github.com/Unpackerr/unpackerr/releases/download/v${UNPACKERR_VERSION}/unpackerr.${TARGETARCH}.linux.gz" && \
-    gunzip -f /tmp/unpackerr.gz && \
+    cd /tmp && \
+    curl -fsSL -O "https://github.com/Unpackerr/unpackerr/releases/download/v${UNPACKERR_VERSION}/checksums.sha256.txt" && \
+    curl -fsSL -O "https://github.com/Unpackerr/unpackerr/releases/download/v${UNPACKERR_VERSION}/unpackerr_${UNPACKERR_VERSION}_linux_${TARGETARCH}.tar.gz" && \
+    grep -F "unpackerr_${UNPACKERR_VERSION}_linux_${TARGETARCH}.tar.gz" checksums.sha256.txt | sha256sum -c && \
+    tar -xzf "unpackerr_${UNPACKERR_VERSION}_linux_${TARGETARCH}.tar.gz" unpackerr && \
     install -m0755 /tmp/unpackerr /usr/bin/unpackerr
 
 # Stage 6: Consolidation - combine all services and deduplicate
 FROM builder-base AS consolidator
 
 COPY --from=radarr-builder /opt/Radarr /opt/Radarr
-COPY --from=radarr-builder /etc/systemd/system/radarr.service /etc/systemd/system/radarr.service
 COPY --from=sonarr-builder /opt/Sonarr /opt/Sonarr
-COPY --from=sonarr-builder /etc/systemd/system/sonarr.service /etc/systemd/system/sonarr.service
 COPY --from=prowlarr-builder /opt/Prowlarr /opt/Prowlarr
-COPY --from=prowlarr-builder /etc/systemd/system/prowlarr.service /etc/systemd/system/prowlarr.service
 COPY --from=unpackerr-builder /usr/bin/unpackerr /usr/bin/unpackerr
 
 # Add update method info (same as ubi)
@@ -80,7 +80,6 @@ ARG RADARR_VERSION
 ARG SONARR_VERSION
 ARG PROWLARR_VERSION
 ARG UNPACKERR_VERSION
-ARG TARGETARCH
 
 # Add labels with service versions (same as ubi)
 LABEL org.opencontainers.image.title="Starr Stack" \
@@ -101,17 +100,15 @@ LABEL org.opencontainers.image.title="Starr Stack" \
 # icu-libs/sqlite-libs: musl .NET needs them (same as linuxserver's arr images).
 # runuser: initialize.sh probes /media as a service user.
 # busybox-openrc wires /etc/inittab-style openrc boot for openrc-init.
-# openrc (the boot runlevel runner) strips the environment by default; the
-# container runtime env (API keys etc.) must reach the services like systemd's
-# PassEnvironment does on ubi. rc_env_allow="*" passes everything through
-# (see env_filter() in src/shared/misc.c).
+# openrc strips the container environment by default (env_filter in
+# src/shared/misc.c); the runtime env (API keys etc.) reaches each service
+# per-service via /etc/conf.d/<service> files written by container-init.sh's
+# harvest — no rc_env_allow needed (and no cross-service leakage).
 RUN apk add --no-cache openrc busybox-openrc bash curl jq icu-libs sqlite-libs runuser ca-certificates && \
-    echo 'rc_env_allow="*"' >> /etc/rc.conf && \
     for u in radarr sonarr prowlarr unpackerr; do \
         addgroup -S "$u" && adduser -S -H -G "$u" "$u"; \
     done && \
-    # initialize.sh `cat >` requires this drop-in dir to exist (created by systemd on ubi)
-    mkdir -p /etc/systemd/system/unpackerr.service.d /run/openrc
+    mkdir -p /run/openrc
 
 # Copy consolidated applications from consolidator stage
 COPY --from=consolidator /opt /opt
@@ -121,8 +118,6 @@ COPY --from=consolidator /opt /opt
 # Group=root for /media sharing.
 RUN chown -R root:root /opt && chmod -R u=rwX,go=rX /opt
 COPY --from=consolidator /usr/bin/unpackerr /usr/bin/unpackerr
-# .service files kept for parity/docs; the OpenRC init scripts are the live config
-COPY --from=consolidator /etc/systemd/system /etc/systemd/system
 COPY config/unpackerr.conf /opt/unpackerr.conf
 
 # Copy configuration scripts (unchanged from the ubi path)
@@ -138,25 +133,10 @@ RUN chmod +x /usr/local/bin/initialize.sh /usr/local/bin/configure-indexers.sh /
 COPY scripts/container-init.sh /sbin/init
 RUN chmod +x /sbin/init
 
-# systemctl-alpine: runtime shim so initialize.sh's `systemctl daemon-reload`
-# succeeds (a no-op under OpenRC) and interactive systemctl works.
-# Its `enable` converter is deliberately NOT used - it drops ordering, UMask,
-# PassEnvironment and FailureAction; the init scripts below mirror the units instead.
-# Release asset names use TARGETARCH directly; TARGETARCH is validated once in builder-base.
-RUN curl -fsSL -o /usr/bin/systemctl \
-      "https://github.com/mobydeck/systemctl-alpine/releases/download/v0.15/systemctl-alpine-${TARGETARCH}" && \
-    chmod +x /usr/bin/systemctl
-
-# OpenRC init scripts: OpenRC equivalents of the systemd units
-COPY services/openrc/radarr.initd /etc/init.d/radarr
-COPY services/openrc/sonarr.initd /etc/init.d/sonarr
-COPY services/openrc/prowlarr.initd /etc/init.d/prowlarr
-COPY services/openrc/unpackerr.initd /etc/init.d/unpackerr
-COPY services/openrc/initialize.initd /etc/init.d/initialize
-COPY services/openrc/configure-indexers.initd /etc/init.d/configure-indexers
-COPY services/openrc/configure-downloadclients.initd /etc/init.d/configure-downloadclients
-RUN chmod +x /etc/init.d/radarr /etc/init.d/sonarr /etc/init.d/prowlarr /etc/init.d/unpackerr \
-             /etc/init.d/initialize /etc/init.d/configure-indexers /etc/init.d/configure-downloadclients && \
+# OpenRC init scripts: OpenRC equivalents of the systemd units. Copied as a
+# directory; OpenRC names services by filename, so repo names = service names.
+COPY services/openrc/ /etc/init.d/
+RUN chmod +x /etc/init.d/* && \
     rc-update add initialize default && \
     rc-update add radarr default && \
     rc-update add sonarr default && \

@@ -1,4 +1,4 @@
-.PHONY: venv test test-static test-quadlet clean
+.PHONY: venv test test-test-alpine test-static test-quadlet clean
 
 venv:
 	@if [ ! -d ".venv" ]; then \
@@ -10,6 +10,11 @@ venv:
 
 test: venv
 	.venv/bin/pytest tests/ -v -ra -s
+
+# Same suite, alpine image: VARIANT selects the dockerfile + run flags
+# (see tests/conftest.py). UNPACKERR_VERSION pins the alpine unpackerr release.
+test-alpine: venv
+	VARIANT=alpine .venv/bin/pytest tests/ -v -ra -s
 
 test-static: venv
 	.venv/bin/pytest tests/test_quadlet.py tests/test_basic.py -v -ra -s

@@ -17,8 +17,7 @@ depend() {
 	need initialize
 }
 
-start_pre() {
-	# unit: UMask=0002 - required by the /media group-writable scheme
-	umask 0002
-	checkpath --directory --mode 0755 /run/prowlarr
-}
+# unit: UMask=0002. Must be an initd VARIABLE, not a start_pre `umask`
+# builtin: supervise-daemon does umask(022) itself and clobbers the inherited
+# value, so the builtin never reaches the daemon (verified empirically).
+umask="0002"

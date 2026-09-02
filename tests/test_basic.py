@@ -130,12 +130,16 @@ def test_opt_root_owned_not_group_writable(running_container):
     assert not writable.stdout.strip(), f"writable paths under /opt:\n{writable.stdout[:500]}"
 
 
-def test_unpackerr_environment_file_root_only(running_container):
-    """environment.conf holds the Radarr/Sonarr API keys; only root (systemd)
-    may read it. Services receive the values through their environment."""
+def test_unpackerr_environment_file_root_only(running_container, variant):
+    """The unpackerr arr credentials must be root-only on disk. ubi keeps them
+    in a systemd drop-in; alpine in /etc/conf.d/unpackerr (written by the
+    PID-1 harvest). Either way the daemon receives them via its environment,
+    not by reading the file."""
+    path = ("/etc/systemd/system/unpackerr.service.d/environment.conf"
+            if variant == "ubi"
+            else "/etc/conf.d/unpackerr")
     result = subprocess.run(
-        ["podman", "exec", running_container, "stat", "-c", "%U %a",
-         "/etc/systemd/system/unpackerr.service.d/environment.conf"],
+        ["podman", "exec", running_container, "stat", "-c", "%U %a", path],
         capture_output=True, text=True, check=True,
     )
     assert result.stdout.strip() == "root 600", result.stdout
