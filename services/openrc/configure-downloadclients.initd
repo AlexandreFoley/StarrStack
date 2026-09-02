@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+# OpenRC equivalent of /etc/systemd/system/configure-downloadclients.service
+# (Type=oneshot, RemainAfterExit=yes, Requires=radarr sonarr, FailureAction=exit).
+name="configure-downloadclients"
+description="Configure download clients for Radarr and Sonarr"
+command="/usr/local/bin/configure-downloadclients.sh"
+
+depend() {
+	need radarr sonarr
+}
+
+start() {
+	ebegin "Starting $RC_SVCNAME"
+	"$command"
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		eend 1 "fatal: configure-downloadclients failed; stopping container (FailureAction=exit parity)"
+		touch /run/starr-failed
+		return $rc
+	fi
+	eend 0
+}

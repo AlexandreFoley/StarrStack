@@ -1,0 +1,16 @@
+#!/bin/sh
+# usermod shim for the Alpine build stages only.
+# Supports the only invocation arrstack-install.sh makes:
+#   usermod -a -G GROUP USER   ->   addgroup USER GROUP
+group=
+user=
+while [ $# -gt 0 ]; do
+	case "$1" in
+	-a) ;;
+	-G) shift ; group="$1" ;;
+	*) user="$1" ;;
+	esac
+	shift
+done
+[ -n "$group" ] && [ -n "$user" ] || { echo "usermod shim: expected -a -G GROUP USER" >&2; exit 2; }
+exec addgroup "$user" "$group"

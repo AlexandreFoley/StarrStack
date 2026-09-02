@@ -1,0 +1,21 @@
+#!/bin/sh
+# dnf -> apk shim for the Alpine build stages only.
+# Translates the exact dnf invocations made by scripts/arrstack-install.sh:
+#   dnf update -y
+#   dnf install -y --skip-broken PKGS
+set -e
+case "$1" in
+update)
+	shift
+	exec apk update $(printf '%s\n' "$@" | sed '/^-/d')
+	;;
+install)
+	shift
+	# drop dnf-only flags (-y and --skip-broken are not apk options)
+	apk add --no-cache $(printf '%s\n' "$@" | sed '/^-/d')
+	;;
+*)
+	echo "dnf shim: unsupported invocation: $*" >&2
+	exit 1
+	;;
+esac

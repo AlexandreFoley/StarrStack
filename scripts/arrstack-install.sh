@@ -111,7 +111,7 @@ ARCH=$(uname -m)
 # get arch
 
 if [ "$app" != "sonarr" ]; then
-    dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=linux&runtime=netcore"
+    dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=${ARR_OS:-linux}&runtime=netcore"
     case "$ARCH" in
     "x86_64") DLURL="${dlbase}&arch=x64" ;;
     "armv7l") DLURL="${dlbase}&arch=arm" ;;
@@ -122,7 +122,7 @@ if [ "$app" != "sonarr" ]; then
         ;;
     esac
 elif [ "$app" == "sonarr" ]; then
-    dlbase="https://services.sonarr.tv/v1/download/main/latest?version=4&os=linux"
+    dlbase="https://services.sonarr.tv/v1/download/main/latest?version=4&os=${ARR_OS:-linux}"
     case "$ARCH" in
     "x86_64") DLURL="${dlbase}&arch=x64" ;;
     "armv7l") DLURL="${dlbase}&arch=arm" ;;

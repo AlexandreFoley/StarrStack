@@ -1,0 +1,3 @@
+#!/bin/sh
+# groupadd shim for the Alpine build stages only (GNU -> busybox).
+exec addgroup -S "$@"

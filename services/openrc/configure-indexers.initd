@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+# OpenRC equivalent of /etc/systemd/system/configure-indexers.service
+# (Type=oneshot, RemainAfterExit=yes, Requires=radarr sonarr prowlarr, FailureAction=exit).
+name="configure-indexers"
+description="Configure Prowlarr with Radarr and Sonarr applications"
+command="/usr/local/bin/configure-indexers.sh"
+
+depend() {
+	need radarr sonarr prowlarr
+}
+
+start() {
+	ebegin "Starting $RC_SVCNAME"
+	"$command"
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		eend 1 "fatal: configure-indexers failed; stopping container (FailureAction=exit parity)"
+		touch /run/starr-failed
+		return $rc
+	fi
+	eend 0
+}
