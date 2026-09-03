@@ -62,6 +62,13 @@ def build_image(variant):
     CLI build because the sdk offers no easy way to stream build progress.
     """
     cmd = ["podman", "build", "--file", DOCKERFILES[variant], "--tag", tag_for(variant), str(REPO_ROOT)]
+    # Registry-backed build cache (buildah's OCI cache images). CI sets
+    # PODMAN_BUILD_CACHE_FROM/TO to a short-lived GHCR tag per variant, so
+    # rebuilds reuse layers across runs instead of going fully cold.
+    for flag, env in (("--cache-from", "PODMAN_BUILD_CACHE_FROM"),
+                      ("--cache-to", "PODMAN_BUILD_CACHE_TO")):
+        if os.environ.get(env):
+            cmd[2:2] = [flag, os.environ[env]]
     if variant == "alpine":
         # Always-latest default (env UNPACKERR_VERSION overrides for pinning
         # or testing a specific release).

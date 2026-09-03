@@ -1,24 +1,76 @@
 name: Test
 
 # Run the pytest suite against both images (ubi and alpine) on GitHub-hosted
-# runners. No custom runner image is needed: the podman python SDK connects to
-# the rootless socket at $XDG_RUNTIME_DIR/podman/podman.sock (see
-# tests/conftest.py) - apt-provided podman + the socket service is the whole
-# story. A matrix runs one variant per job so each fresh runner builds a single
-# image (keeps the build within the runner's ~14GB disk and parallelizes).
+# runners. Two things keep this cheap:
+#   - skip: a paths-filter job gates each variant; a variant (and its tests)
+#     only runs when something it depends on changed. 'schedule' and manual
+#     dispatch always run both (they exist to catch upstream version bumps).
+#   - cache: builds use buildah's registry-backed build cache (--cache-from/
+#     --cache-to) pointing at short-lived GHCR tags per variant. Set GHCR
+#     package retention (Settings > Packages) to ~7 days for the two
+#     build-cache-* packages to keep the cache short-lived.
+# No custom runner image needed: the podman python SDK connects to the rootless
+# socket at $XDG_RUNTIME_DIR/podman/podman.sock (see tests/conftest.py).
 
 on:
   push:
     branches: ["main"]
   pull_request:
     branches: ["main"]
+  schedule:
+    - cron: "0 6 * * 1"   # weekly canary: both variants, whatever changed
   workflow_dispatch:
 
 permissions:
   contents: read
+  packages: write   # push build-cache images to GHCR
 
 jobs:
+  changes:
+    if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      ubi: ${{ steps.filter.outputs.ubi }}
+      alpine: ${{ steps.filter.outputs.alpine }}
+      tests: ${{ steps.filter.outputs.tests }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ubi:
+              - 'ubi.dockerfile'
+              - 'scripts/arrstack-install.sh'
+              - 'scripts/initialize.sh'
+              - 'scripts/configure-*.sh'
+              - 'scripts/repo.sh'
+              - 'scripts/deduplicate.sh'
+              - 'services/*.service'
+              - 'config/unpackerr.conf'
+            alpine:
+              - 'alpine.dockerfile'
+              - 'scripts/arrstack-install.sh'
+              - 'scripts/initialize.sh'
+              - 'scripts/configure-*.sh'
+              - 'scripts/container-init.sh'
+              - 'scripts/alpine/**'
+              - 'services/openrc/**'
+              - 'config/unpackerr.conf'
+            tests:
+              - 'tests/**'
+              - 'Makefile'
+              - 'requirements-test.txt'
+              - '.github/workflows/test.yml'
+
   test:
+    needs: changes
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.tests == 'true' ||
+       needs.changes.outputs[matrix.variant] == 'true')
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +79,9 @@ jobs:
     timeout-minutes: 30
     env:
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
+      # Bare repository (no tag): buildah manages its own cache tags there.
+      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-${{ matrix.variant }}
+      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-${{ matrix.variant }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +94,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
           # Ensure the runner user (uid 1001 on ubuntu-latest) has userns
-          # ranges for rootless storage (defensive; debian/ubuntu images may
+          # ranges for rootless storage (defensive; the runner image may
           # already carry them).
           if ! grep -q "^$USER:" /etc/subuid; then
             sudo sh -c 'echo "$USER:100000:65536" >> /etc/subuid'
@@ -59,6 +114,11 @@ jobs:
             sleep 1
           done
           ls -l "$XDG_RUNTIME_DIR/podman/podman.sock"
+
+      - name: Login to GHCR (build cache push)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io \
+            -u "${{ github.actor }}" --password-stdin
 
       - name: Install python deps
         run: pip install -r requirements-test.txt
