@@ -63,8 +63,19 @@ def build_image(variant):
         version = os.environ.get("UNPACKERR_VERSION") or latest_unpackerr()
         print(f"container: building alpine image with unpackerr {version}", flush=True)
         cmd[2:2] = ["--build-arg", f"UNPACKERR_VERSION={version}"]
-    result = subprocess.run(cmd)
-    result.check_returncode()
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode:
+        # CalledProcessError alone hides podman's message; surface the cause.
+        tail = "\n".join((result.stderr or "").splitlines()[-10:])
+        hint = ("Is the podman machine running? `podman machine start`. "
+                "Are you in the repo root (dockerfiles relative to cwd)? "
+                ) if ("Cannot connect" in (result.stderr or "")
+                     or "file not found" in (result.stderr or ""))\
+                else ""
+        raise SystemExit(
+            f"podman build failed for {variant} (exit {result.returncode})\n"
+            f"cmd: {' '.join(cmd)}\n{hint}last output:\n{tail}"
+        )
 
 @pytest.fixture(scope="session")
 def podman_client():
