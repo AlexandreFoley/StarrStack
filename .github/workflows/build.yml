@@ -97,7 +97,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -142,7 +142,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-amd64 starrstack-test-amd64:${{ github.sha }}
 
       - name: Push AMD64 image
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         run: |
           docker tag starrstack-test-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
@@ -164,7 +164,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -210,7 +210,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-arm64 starrstack-test-arm64:${{ github.sha }}
 
       - name: Push ARM64 image
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         run: |
           docker tag starrstack-test-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
@@ -230,7 +230,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -276,7 +276,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-alpine-amd64 starrstack-test-alpine-amd64:${{ github.sha }}
 
       - name: Push Alpine AMD64 image
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         run: |
           docker tag starrstack-test-alpine-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
@@ -298,7 +298,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Container Registry
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -345,7 +345,7 @@ jobs:
         run: bash .github/scripts/test-image.sh test-arrstack-alpine-arm64 starrstack-test-alpine-arm64:${{ github.sha }}
 
       - name: Push Alpine ARM64 image
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
         run: |
           docker tag starrstack-test-alpine-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
@@ -353,7 +353,7 @@ jobs:
   manifest:
     needs: [versions, build-amd64, build-arm64, build-alpine-amd64, build-alpine-arm64]
     runs-on: ubuntu-latest
-    if: always() && needs.build-amd64.result == 'success' && github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+    if: always() && needs.build-amd64.result == 'success' && github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
       packages: write
@@ -409,7 +409,7 @@ jobs:
   release:
     needs: [versions, manifest, build-arm64, build-alpine-amd64, build-alpine-arm64]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     steps:
