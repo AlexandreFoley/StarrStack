@@ -1,0 +1,33 @@
+name: Package Retention
+
+# Keep GHCR retention short for the build-cache packages (the "short-lived
+# image cache"). Runs weekly and on demand; GITHUB_TOKEN has packages: write
+# within this repo, which is admin for its repo-scoped packages.
+# UI equivalent: repo Settings > Packages > edit each package.
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"   # weekly Sunday
+  workflow_dispatch:
+
+permissions:
+  packages: write
+
+jobs:
+  set-retention:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set 7-day retention on the build-cache packages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for pkg in build-cache-ubi build-cache-alpine; do
+            name="starrstack%2F${pkg}"   # URL-encoded package name
+            if gh api --method PATCH \
+                "repos/${{ github.repository }}/packages/container/${name}" \
+                -f package_retention_days=7 --silent 2>/dev/null; then
+              echo "retention set to 7 days: $name"
+            else
+              echo "skip (package absent or no permission): $name"
+            fi
+          done

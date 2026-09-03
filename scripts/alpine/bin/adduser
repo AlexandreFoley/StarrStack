@@ -1,0 +1,17 @@
+#!/bin/sh
+# adduser shim for the Alpine build stages only.
+# Translates the GNU adduser invocation made by arrstack-install.sh
+# (adduser --system --no-create-home --gid GROUP USER) to busybox adduser.
+# -D: no password for these system service users (matches useradd --system).
+args=
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--system) args="$args -S" ;;
+	--no-create-home) args="$args -H" ;;
+	--gid) shift ; args="$args -G $1" ;;
+	--shell) shift ; args="$args -s $1" ;;
+	*) args="$args $1" ;;
+	esac
+	shift
+done
+exec /bin/busybox adduser -D $args

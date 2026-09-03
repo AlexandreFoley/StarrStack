@@ -4,8 +4,6 @@ import socket
 import requests
 import pytest
 
-REQUIRED_PORTS = (7878, 8989, 9696)
-
 
 def port_is_available(port):
     """Return True when the host TCP port is free to bind."""
@@ -31,9 +29,11 @@ def wait_for_service(url, timeout=120, poll_interval=10):
     return False
 
 
-def test_required_ports_available():
-    """Required host ports should be free before starting the test container."""
-    unavailable = [port for port in REQUIRED_PORTS if not port_is_available(port)]
+def test_required_ports_available(host_port):
+    """The variant's host ports must be free before starting the test
+    container (both variants run side by side in one session, each on its
+    own port range)."""
+    unavailable = [port for port in host_port.values() if not port_is_available(port)]
     assert not unavailable, (
         "Required host ports are already in use: "
         f"{', '.join(str(port) for port in unavailable)}. "
@@ -59,19 +59,19 @@ def test_starr_container_has_logs(running_container):
 
     assert logs
 
-def test_radarr_health(running_container, api_key):
+def test_radarr_health(running_container, api_key, host_port):
     """Radarr should respond to health check within timeout."""
-    url = f"http://localhost:7878/api/v3/system/status?apikey={api_key}"
+    url = f"http://localhost:{host_port['7878']}/api/v3/system/status?apikey={api_key}"
     assert wait_for_service(url), "Radarr did not respond within 120s"
 
-def test_sonarr_health(running_container, api_key):
+def test_sonarr_health(running_container, api_key, host_port):
     """Sonarr should respond to health check within timeout."""
-    url = f"http://localhost:8989/api/v3/system/status?apikey={api_key}"
+    url = f"http://localhost:{host_port['8989']}/api/v3/system/status?apikey={api_key}"
     assert wait_for_service(url), "Sonarr did not respond within 120s"
 
-def test_prowlarr_health(running_container, api_key):
+def test_prowlarr_health(running_container, api_key, host_port):
     """Prowlarr should respond to health check within timeout."""
-    url = f"http://localhost:9696/api/v1/system/status?apikey={api_key}"
+    url = f"http://localhost:{host_port['9696']}/api/v1/system/status?apikey={api_key}"
     assert wait_for_service(url), "Prowlarr did not respond within 120s"
 
 
@@ -130,12 +130,16 @@ def test_opt_root_owned_not_group_writable(running_container):
     assert not writable.stdout.strip(), f"writable paths under /opt:\n{writable.stdout[:500]}"
 
 
-def test_unpackerr_environment_file_root_only(running_container):
-    """environment.conf holds the Radarr/Sonarr API keys; only root (systemd)
-    may read it. Services receive the values through their environment."""
+def test_unpackerr_environment_file_root_only(running_container, variant):
+    """The unpackerr arr credentials must be root-only on disk. ubi keeps them
+    in a systemd drop-in; alpine in /etc/conf.d/unpackerr (written by the
+    PID-1 harvest). Either way the daemon receives them via its environment,
+    not by reading the file."""
+    path = ("/etc/systemd/system/unpackerr.service.d/environment.conf"
+            if variant == "ubi"
+            else "/etc/conf.d/unpackerr")
     result = subprocess.run(
-        ["podman", "exec", running_container, "stat", "-c", "%U %a",
-         "/etc/systemd/system/unpackerr.service.d/environment.conf"],
+        ["podman", "exec", running_container, "stat", "-c", "%U %a", path],
         capture_output=True, text=True, check=True,
     )
     assert result.stdout.strip() == "root 600", result.stdout

@@ -1,0 +1,23 @@
+#!/sbin/openrc-run
+# OpenRC equivalent of /usr/lib/systemd/system/unpackerr.service (golift unit)
+# plus the ubi override: Group=root, UMask=0002.
+# UN_* env comes from /etc/conf.d/unpackerr (per-service harvest, container-init.sh).
+name="unpackerr"
+description="unpackerr - archive extraction daemon"
+command="/usr/bin/unpackerr"
+command_user="unpackerr:root"
+supervisor="supervise-daemon"
+respawn_delay="2"
+# respawn_max=0 means unlimited (unit: Restart=always never gives up).
+# ponytail: supervise-daemon respawns on any exit, systemd only per Restart= - fine in practice.
+respawn_max="0"
+
+depend() {
+	# initialize creates and chowns /config/unpackerr; must run first
+	need initialize
+}
+
+# unit: UMask=0002. Must be an initd VARIABLE, not a start_pre `umask`
+# builtin: supervise-daemon does umask(022) itself and clobbers the inherited
+# value, so the builtin never reaches the daemon (verified empirically).
+umask="0002"

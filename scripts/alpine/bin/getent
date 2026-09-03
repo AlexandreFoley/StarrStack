@@ -1,0 +1,17 @@
+#!/bin/sh
+# getent shim for the Alpine build stages only.
+# Alpine busybox (main and busybox-extras) has no getent applet. Enough for
+# the lookups arrstack-install.sh performs (passwd/group by user/group name).
+case "$1" in
+passwd)
+	[ -n "$2" ] || exit 2
+	awk -F: -v u="$2" '$1 == u { print; found = 1 } END { exit !found }' /etc/passwd
+	;;
+group)
+	[ -n "$2" ] || exit 2
+	awk -F: -v g="$2" '$1 == g { print; found = 1 } END { exit !found }' /etc/group
+	;;
+*)
+	exit 2
+	;;
+esac

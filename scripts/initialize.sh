@@ -54,9 +54,12 @@ else
     echo "  *** Use UMASK=002 on your download client (the qbittorrent unit already does)."
 fi
 
-# Create environment file for Unpackerr with dynamic values from arr services
-# This allows Unpackerr to use user-supplied API keys and URLs
-cat > /etc/systemd/system/unpackerr.service.d/environment.conf <<EOF
+# systemd build only (ubi). Unpackerr's UN_* env is a systemd drop-in there.
+# On the OpenRC build (alpine) the container runtime env is harvested
+# per-service into /etc/conf.d/<service> by container-init.sh (PID 1), which
+# openrc-run sources for that service alone - so none of this applies.
+if [ -d /run/systemd/system ]; then
+    cat > /etc/systemd/system/unpackerr.service.d/environment.conf <<EOF
 [Service]
 Environment="UN_RADARR_0_API_KEY=${RADARR__AUTH__APIKEY}"
 Environment="UN_RADARR_0_URL=http://127.0.0.1:${RADARR__SERVER__PORT}${RADARR__SERVER__URLBASE}"
@@ -64,14 +67,17 @@ Environment="UN_SONARR_0_API_KEY=${SONARR__AUTH__APIKEY}"
 Environment="UN_SONARR_0_URL=http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
 EOF
 
-# Root-only: contains the Radarr and Sonarr API keys. systemd (PID 1) reads
-# drop-ins regardless; services receive the values via their environment.
-chmod 600 /etc/systemd/system/unpackerr.service.d/environment.conf
+    # Root-only: contains the Radarr and Sonarr API keys. systemd (PID 1) reads
+    # drop-ins regardless; services receive the values via their environment.
+    chmod 600 /etc/systemd/system/unpackerr.service.d/environment.conf
 
-# Reload systemd to pick up the new service configuration
-systemctl daemon-reload
+    # Reload systemd to pick up the new service configuration
+    systemctl daemon-reload
+fi
 
 echo "Initialization complete:"
 echo "  ✓ /config service directories owned per-service (700, isolated)"
-echo "  ✓ Unpackerr environment configured from arr service settings"
+if [ -d /run/systemd/system ]; then
+    echo "  ✓ Unpackerr environment configured from arr service settings"
+fi
 

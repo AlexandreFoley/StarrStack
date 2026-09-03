@@ -26,7 +26,3 @@ Alternative basé sur Alpine pour *arr:
         - https://stackoverflow.com/questions/78269734/is-there-a-better-way-to-run-openrc-in-a-container-than-enabling-softlevel
         - dépendence sur setfacl pour gérer les permissions des services sut les dossiers dans config. problème?
 
-## TODO
-
-- [ ] qbittorrent downloads land as subuid 101000:101000 (PUID/PGID=1000 in its rootless container): starr services get "other" perms only, so imports can't delete source files. Fix: give starr services SupplementaryGroups=1000 (shared subgid range makes it the same group in both containers); optionally move service groups to system gids and name gid 1000 "downloads". Also shelved: per-service idmapped /media mounts or bindfs for fully host-owned media files (complexity not justified yet).
-- [ ] Verify whether unpackerr actually uses /config/unpackerr (its config lives at /opt/unpackerr.conf). If not make sure it uses /config for its configuration. non-urgent as unpacker should work without further conf.

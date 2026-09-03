@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+# OpenRC equivalent of /etc/systemd/system/initialize.service
+# (Type=oneshot, RemainAfterExit=yes, FailureAction=exit).
+name="initialize"
+description="Initialize container: permissions and environment setup"
+command="/usr/local/bin/initialize.sh"
+
+start() {
+	ebegin "Starting $RC_SVCNAME"
+	"$command"
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		eend 1 "fatal: initialize failed; stopping container (FailureAction=exit parity)"
+		touch /run/starr-failed
+		return $rc
+	fi
+	eend 0
+}
