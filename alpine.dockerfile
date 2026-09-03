@@ -130,6 +130,10 @@ RUN chmod +x /usr/local/bin/initialize.sh /usr/local/bin/configure-indexers.sh /
 # exits when a required oneshot fails (openrc-init cannot terminate a rootless
 # container - its reboot(2) shutdown path needs init-userns CAP_SYS_BOOT, and
 # PID 1 is SIGKILL-immune in rootless runtimes, verified empirically).
+# rm the base's /sbin/init busybox symlink first: buildkit's overlay copy-up
+# fails to exec /bin/sh in the step after COPYing over a base symlink
+# (works fine under buildah; breaks under GitHub's docker buildx, verified).
+RUN rm -f /sbin/init
 COPY scripts/container-init.sh /sbin/init
 RUN chmod +x /sbin/init
 
