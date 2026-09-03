@@ -78,11 +78,16 @@ jobs:
     env:
       VARIANT: ubi
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
-      # Bare repository (no tag): buildah manages its own cache tags there.
-      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ lower(github.repository) }}/build-cache-ubi
-      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ lower(github.repository) }}/build-cache-ubi
     steps: &test-steps
       - uses: actions/checkout@v4
+
+      - name: Compute GHCR build-cache repository (registry names must be
+          lowercase; github.repository is not)
+        run: |
+          cache_repo="ghcr.io/${GITHUB_REPOSITORY,,}/build-cache-${VARIANT}"
+          echo "PODMAN_BUILD_CACHE_FROM=${cache_repo}" >> "$GITHUB_ENV"
+          echo "PODMAN_BUILD_CACHE_TO=${cache_repo}" >> "$GITHUB_ENV"
+          echo "cache repo: ${cache_repo}"
 
       - uses: actions/setup-python@v5
         with:
@@ -136,6 +141,4 @@ jobs:
     env:
       VARIANT: alpine
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
-      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ lower(github.repository) }}/build-cache-alpine
-      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ lower(github.repository) }}/build-cache-alpine
     steps: *test-steps
