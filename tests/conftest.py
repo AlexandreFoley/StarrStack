@@ -6,14 +6,23 @@ import uuid
 import pytest
 from podman import PodmanClient
 
-# One test suite, two images. VARIANT=ubi (default) | alpine picks the
-# dockerfile and the container run flags; the runtime tests in test_basic.py
-# are shared except where the images genuinely differ (the unpackerr env file).
-VARIANT = os.environ.get("VARIANT", "ubi")
+# One test suite, both images. By default every runtime test runs against
+# both variants in a single session; VARIANT=ubi|alpine restricts to one
+# (useful for fast dev loops and per-variant CI jobs).
+VARIANTS = [os.environ["VARIANT"]] if "VARIANT" in os.environ else ["ubi", "alpine"]
 
 DOCKERFILES = {"ubi": "ubi.dockerfile", "alpine": "alpine.dockerfile"}
 
-TAG = f"starr-test-{VARIANT}:latest"
+# Host ports per variant: the app ports inside the container are the same
+# (7878/8989/9696); only the host-side publish differs so both containers can
+# run side by side in one session without conflicting.
+HOST_PORTS = {
+    "ubi": {"7878": 7878, "8989": 8989, "9696": 9696},
+    "alpine": {"7878": 17978, "8989": 17989, "9696": 17969},
+}
+
+def tag_for(variant):
+    return f"starr-test-{variant}:latest"
 
 
 def latest_unpackerr() -> str:
@@ -27,9 +36,14 @@ def latest_unpackerr() -> str:
         return json.load(resp)["tag_name"].lstrip("v")
 
 
+@pytest.fixture(scope="session", params=VARIANTS)
+def variant(request):
+    return request.param
+
+
 @pytest.fixture(scope="session")
-def variant():
-    return VARIANT
+def host_port(variant):
+    return HOST_PORTS[variant]
 
 
 @pytest.fixture(scope="session")
@@ -38,12 +52,12 @@ def api_key():
     return uuid.uuid4().hex
 
 
-def build_image():
-    """Build the image for the active VARIANT, streaming output to stdout.
+def build_image(variant):
+    """Build the image for the given variant, streaming output to stdout.
     CLI build because the sdk offers no easy way to stream build progress.
     """
-    cmd = ["podman", "build", "--file", DOCKERFILES[VARIANT], "--tag", TAG, "."]
-    if VARIANT == "alpine":
+    cmd = ["podman", "build", "--file", DOCKERFILES[variant], "--tag", tag_for(variant), "."]
+    if variant == "alpine":
         # Always-latest default (env UNPACKERR_VERSION overrides for pinning
         # or testing a specific release).
         version = os.environ.get("UNPACKERR_VERSION") or latest_unpackerr()
@@ -59,25 +73,20 @@ def podman_client():
         yield client
 
 @pytest.fixture(scope="session")
-def built_image(podman_client:PodmanClient):
-    """Build image for the active VARIANT, yield image object.
+def built_image(podman_client:PodmanClient, variant):
+    """Build image for the variant, yield image object.
 
     Equivalent command line for the ubi variant:
     podman build --file ubi.dockerfile --tag starr-test-ubi:latest .
     """
-    build_image()
-    yield podman_client.images.get(TAG)
+    build_image(variant)
+    yield podman_client.images.get(tag_for(variant))
 
 @pytest.fixture(scope="session")
-def running_container(podman_client:PodmanClient, built_image, api_key):
-    """Start container, yield name, cleanup on exit.
+def running_container(podman_client:PodmanClient, built_image, api_key, variant):
+    """Start the variant's container (host ports differ per variant so both can
+    run side by side), yield name, cleanup on exit.
 
-    Equivalent command line for the ubi variant:
-    podman run -d --name starr-test-<uuid> -p 7878:7878 -p 8989:8989 -p 9696:9696 \
-      -e RADARR__AUTH__APIKEY=<key> -e RADARR__SERVER__PORT=7878 \
-      -e SONARR__AUTH__APIKEY=<key> -e SONARR__SERVER__PORT=8989 \
-      -e PROWLARR__AUTH__APIKEY=<key> -e PROWLARR__SERVER__PORT=9696 \
-      starr-test-ubi:latest
     podman's --systemd default is true and auto-detects systemd by the
     command being /sbin/init, so no flag is needed for the ubi image (its
     /sbin/init really is systemd). The alpine image's /sbin/init is our OpenRC
@@ -85,13 +94,13 @@ def running_container(podman_client:PodmanClient, built_image, api_key):
     keeps podman's stop signal at SIGTERM so the wrapper's graceful
     `openrc shutdown` path runs on podman stop.
     """
-    name = f"starr-test-{uuid.uuid4()}"
+    name = f"starr-test-{variant}-{uuid.uuid4()}"
     run_kwargs = dict(
         detach=True,
         tty=True,
         # stdin_open=True,
         name=name,
-        ports={"7878/tcp": 7878, "8989/tcp": 8989, "9696/tcp": 9696},
+        ports={f"{p}/tcp": hp for p, hp in HOST_PORTS[variant].items()},
         environment={
             "RADARR__AUTH__APIKEY": api_key,
             "RADARR__SERVER__PORT": "7878",
@@ -101,7 +110,7 @@ def running_container(podman_client:PodmanClient, built_image, api_key):
             "PROWLARR__SERVER__PORT": "9696",
         },
     )
-    if VARIANT == "alpine":
+    if variant == "alpine":
         run_kwargs["systemd"] = "false"
     try:
         podman_client.containers.run(built_image, **run_kwargs)
