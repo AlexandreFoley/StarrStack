@@ -79,8 +79,8 @@ jobs:
       VARIANT: ubi
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
       # Bare repository (no tag): buildah manages its own cache tags there.
-      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-ubi
-      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-ubi
+      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ lower(github.repository) }}/build-cache-ubi
+      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ lower(github.repository) }}/build-cache-ubi
     steps: &test-steps
       - uses: actions/checkout@v4
 
@@ -136,6 +136,6 @@ jobs:
     env:
       VARIANT: alpine
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
-      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-alpine
-      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-alpine
+      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ lower(github.repository) }}/build-cache-alpine
+      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ lower(github.repository) }}/build-cache-alpine
     steps: *test-steps
