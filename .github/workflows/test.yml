@@ -1,0 +1,67 @@
+name: Test
+
+# Run the pytest suite against both images (ubi and alpine) on GitHub-hosted
+# runners. No custom runner image is needed: the podman python SDK connects to
+# the rootless socket at $XDG_RUNTIME_DIR/podman/podman.sock (see
+# tests/conftest.py) - apt-provided podman + the socket service is the whole
+# story. A matrix runs one variant per job so each fresh runner builds a single
+# image (keeps the build within the runner's ~14GB disk and parallelizes).
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [ubi, alpine]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install rootless podman toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          # Ensure the runner user (uid 1001 on ubuntu-latest) has userns
+          # ranges for rootless storage (defensive; debian/ubuntu images may
+          # already carry them).
+          if ! grep -q "^$USER:" /etc/subuid; then
+            sudo sh -c 'echo "$USER:100000:65536" >> /etc/subuid'
+            sudo sh -c 'echo "$USER:100000:65536" >> /etc/subgid'
+          fi
+          podman version
+
+      - name: Start rootless podman service (SDK socket)
+        run: |
+          mkdir -p "$XDG_RUNTIME_DIR/podman"
+          # Manual start: user systemd may not be running on the runner.
+          nohup podman system service --time=0 \
+            "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
+            >/tmp/podman-service.log 2>&1 &
+          for i in $(seq 1 20); do
+            [ -S "$XDG_RUNTIME_DIR/podman/podman.sock" ] && break
+            sleep 1
+          done
+          ls -l "$XDG_RUNTIME_DIR/podman/podman.sock"
+
+      - name: Install python deps
+        run: pip install -r requirements-test.txt
+
+      - name: Run the suite for the ${{ matrix.variant }} variant
+        run: make test-${{ matrix.variant }}
