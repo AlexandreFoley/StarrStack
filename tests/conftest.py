@@ -3,6 +3,7 @@ import os
 import subprocess
 import urllib.request
 import uuid
+from pathlib import Path
 import pytest
 from podman import PodmanClient
 
@@ -11,7 +12,11 @@ from podman import PodmanClient
 # (useful for fast dev loops and per-variant CI jobs).
 VARIANTS = [os.environ["VARIANT"]] if "VARIANT" in os.environ else ["ubi", "alpine"]
 
-DOCKERFILES = {"ubi": "ubi.dockerfile", "alpine": "alpine.dockerfile"}
+# Repo root, resolved from this file - never from cwd, so the suite works no
+# matter where pytest is invoked from.
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+DOCKERFILES = {v: str(REPO_ROOT / f"{v}.dockerfile") for v in ("ubi", "alpine")}
 
 # Host ports per variant: the app ports inside the container are the same
 # (7878/8989/9696); only the host-side publish differs so both containers can
@@ -56,7 +61,7 @@ def build_image(variant):
     """Build the image for the given variant, streaming output to stdout.
     CLI build because the sdk offers no easy way to stream build progress.
     """
-    cmd = ["podman", "build", "--file", DOCKERFILES[variant], "--tag", tag_for(variant), "."]
+    cmd = ["podman", "build", "--file", DOCKERFILES[variant], "--tag", tag_for(variant), str(REPO_ROOT)]
     if variant == "alpine":
         # Always-latest default (env UNPACKERR_VERSION overrides for pinning
         # or testing a specific release).
@@ -68,9 +73,7 @@ def build_image(variant):
         # CalledProcessError alone hides podman's message; surface the cause.
         tail = "\n".join((result.stderr or "").splitlines()[-10:])
         hint = ("Is the podman machine running? `podman machine start`. "
-                "Are you in the repo root (dockerfiles relative to cwd)? "
-                ) if ("Cannot connect" in (result.stderr or "")
-                     or "file not found" in (result.stderr or ""))\
+                ) if "Cannot connect" in (result.stderr or "")\
                 else ""
         raise SystemExit(
             f"podman build failed for {variant} (exit {result.returncode})\n"
