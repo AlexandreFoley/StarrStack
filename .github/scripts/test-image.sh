@@ -42,13 +42,16 @@ mkdir -p "${TEST_BASE_DIR}/config-${CONTAINER}" "${TEST_BASE_DIR}/media-${CONTAI
 
 # Runtime-specific flags for the container run
 RUN_FLAGS=()
-if [ "${CONTAINER_RUNTIME}" = "podman" ]; then
+if [ "${CONTAINER_RUNTIME}" = "podman" ] && [ -z "${PODMAN_NO_SYSTEMD:-}" ]; then
+  # systemd mode only for the ubi image (real systemd as PID 1); the alpine
+  # image runs its own init wrapper and must not get --systemd=always
+  # (podman would SIGRTMIN+3 it on stop and treat it as systemd).
   RUN_FLAGS+=(--systemd=always --privileged -v /sys/fs/cgroup:/sys/fs/cgroup:rw)
 fi
 
 # NOTE: do NOT use --rm in detached mode; we want logs available if it crashes early.
 ${CONTAINER_RUNTIME} run -d --name "${CONTAINER}" \
-  "${RUN_FLAGS[@]}" \
+  "${RUN_FLAGS[@]+"${RUN_FLAGS[@]}"}" \
   -p 7878:7878 \
   -p 8989:8989 \
   -p 9696:9696 \

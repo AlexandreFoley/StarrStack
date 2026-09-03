@@ -215,8 +215,143 @@ jobs:
           docker tag starrstack-test-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
           docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
 
+
+  build-alpine-amd64:
+    needs: versions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Alpine AMD64 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./alpine.dockerfile
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: starrstack-test-alpine-amd64:${{ github.sha }}
+          cache-from: type=gha,scope=alpine-amd64
+          cache-to: type=gha,mode=max,scope=alpine-amd64
+          build-args: |
+            RADARR_VERSION=${{ needs.versions.outputs.radarr }}
+            SONARR_VERSION=${{ needs.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ needs.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+
+      - name: Install Podman (if missing)
+        run: |
+          if command -v podman >/dev/null 2>&1; then
+            podman --version
+          else
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends podman
+            podman --version
+          fi
+
+      - name: Import Alpine AMD64 image into Podman
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-alpine-amd64:${{ github.sha }}
+
+      - name: Test Alpine AMD64 image locally
+        env:
+          CONTAINER_RUNTIME: podman
+          PODMAN_NO_SYSTEMD: "1"
+        run: bash .github/scripts/test-image.sh test-arrstack-alpine-amd64 starrstack-test-alpine-amd64:${{ github.sha }}
+
+      - name: Push Alpine AMD64 image
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        run: |
+          docker tag starrstack-test-alpine-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
+          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
+
+  build-alpine-arm64:
+    needs: versions
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    continue-on-error: true
+    outputs:
+      success: ${{ steps.build.outcome == 'success' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Alpine ARM64 image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./alpine.dockerfile
+          platforms: linux/arm64
+          push: false
+          load: true
+          tags: starrstack-test-alpine-arm64:${{ github.sha }}
+          cache-from: type=gha,scope=alpine-arm64
+          cache-to: type=gha,mode=max,scope=alpine-arm64
+          build-args: |
+            RADARR_VERSION=${{ needs.versions.outputs.radarr }}
+            SONARR_VERSION=${{ needs.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ needs.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ needs.versions.outputs.unpackerr }}
+            BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+            VCS_REF=${{ github.sha }}
+
+      - name: Install Podman (if missing)
+        run: |
+          if command -v podman >/dev/null 2>&1; then
+            podman --version
+          else
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends podman
+            podman --version
+          fi
+
+      - name: Import Alpine ARM64 image into Podman
+        run: bash .github/scripts/docker-to-podman.sh starrstack-test-alpine-arm64:${{ github.sha }}
+
+      - name: Test Alpine ARM64 image locally
+        env:
+          CONTAINER_RUNTIME: podman
+          PODMAN_NO_SYSTEMD: "1"
+        run: bash .github/scripts/test-image.sh test-arrstack-alpine-arm64 starrstack-test-alpine-arm64:${{ github.sha }}
+
+      - name: Push Alpine ARM64 image
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
+        run: |
+          docker tag starrstack-test-alpine-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
+          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
+
   manifest:
-    needs: [versions, build-amd64, build-arm64]
+    needs: [versions, build-amd64, build-arm64, build-alpine-amd64, build-alpine-arm64]
     runs-on: ubuntu-latest
     if: always() && needs.build-amd64.result == 'success' && github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
     permissions:
@@ -254,8 +389,25 @@ jobs:
           # Create manifest for latest tag
           docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:latest $IMAGES
 
+
+      - name: Create and push alpine multi-arch manifest
+        if: needs.build-alpine-amd64.result == 'success'
+        run: |
+          ALPINE_IMAGES="ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64"
+
+          if [ "${{ needs.build-alpine-arm64.outputs.success }}" == "true" ]; then
+            ALPINE_IMAGES="$ALPINE_IMAGES ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64"
+            echo "Including both AMD64 and ARM64 in alpine manifest"
+          else
+            echo "Alpine ARM64 build failed or was skipped, creating AMD64-only alpine manifest"
+          fi
+
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine $ALPINE_IMAGES
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}-alpine $ALPINE_IMAGES
+          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:alpine $ALPINE_IMAGES
+
   release:
-    needs: [versions, manifest, build-arm64]
+    needs: [versions, manifest, build-arm64, build-alpine-amd64, build-alpine-arm64]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true'
     permissions:
@@ -276,6 +428,7 @@ jobs:
             ### Image
             - Registry: `ghcr.io/${{ needs.versions.outputs.repo_lower }}`
             - Tag: `radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}`
+            - **Alpine**: `ghcr.io/${{ needs.versions.outputs.repo_lower }}:alpine` (same versions, OpenRC-based, ~25% smaller)
             - Latest Build: `${{ github.run_number }}`
             - Latest SHA: `${{ github.sha }}`
             - Architectures: ${{ needs.build-arm64.outputs.success == 'true' && 'AMD64, ARM64' || 'AMD64 only (ARM64 build failed)' }}
