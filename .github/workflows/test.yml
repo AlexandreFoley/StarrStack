@@ -11,6 +11,9 @@ name: Test
 #     build-cache-* packages to keep the cache short-lived.
 # No custom runner image needed: the podman python SDK connects to the rootless
 # socket at $XDG_RUNTIME_DIR/podman/podman.sock (see tests/conftest.py).
+#
+# Note: no matrix.context in job-level `if:`, so the two variants are explicit
+# jobs that differ only by `env`; `matrix` is not available there.
 
 on:
   push:
@@ -64,25 +67,21 @@ jobs:
               - 'requirements-test.txt'
               - '.github/workflows/test.yml'
 
-  test:
+  test-ubi:
     needs: changes
     if: >-
       !cancelled() &&
       (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
-       needs.changes.outputs.tests == 'true' ||
-       needs.changes.outputs[matrix.variant] == 'true')
-    strategy:
-      fail-fast: false
-      matrix:
-        variant: [ubi, alpine]
+       needs.changes.outputs.tests == 'true' || needs.changes.outputs.ubi == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
+      VARIANT: ubi
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
       # Bare repository (no tag): buildah manages its own cache tags there.
-      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-${{ matrix.variant }}
-      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-${{ matrix.variant }}
-    steps:
+      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-ubi
+      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-ubi
+    steps: &test-steps
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -123,5 +122,20 @@ jobs:
       - name: Install python deps
         run: pip install -r requirements-test.txt
 
-      - name: Run the suite for the ${{ matrix.variant }} variant
-        run: make test-${{ matrix.variant }}
+      - name: Run the suite for ${{ env.VARIANT }}
+        run: make test-${{ env.VARIANT }}
+
+  test-alpine:
+    needs: changes
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.tests == 'true' || needs.changes.outputs.alpine == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VARIANT: alpine
+      XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
+      PODMAN_BUILD_CACHE_FROM: ghcr.io/${{ github.repository }}/build-cache-alpine
+      PODMAN_BUILD_CACHE_TO: ghcr.io/${{ github.repository }}/build-cache-alpine
+    steps: *test-steps
