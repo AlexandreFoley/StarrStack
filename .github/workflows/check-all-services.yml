@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  actions: write
 
 jobs:
   check-all:
@@ -46,7 +45,7 @@ jobs:
       any-updates: ${{ steps.summary.outputs.any-updates }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Calculate check window
         id: window
@@ -118,24 +117,36 @@ jobs:
     needs: check-all
     if: needs.check-all.outputs.any-updates == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Trigger build workflow
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          RADARR_UPDATE: ${{ needs.check-all.outputs.radarr-update }}
+          RADARR_VERSION: ${{ needs.check-all.outputs.radarr-version }}
+          SONARR_UPDATE: ${{ needs.check-all.outputs.sonarr-update }}
+          SONARR_VERSION: ${{ needs.check-all.outputs.sonarr-version }}
+          PROWLARR_UPDATE: ${{ needs.check-all.outputs.prowlarr-update }}
+          PROWLARR_VERSION: ${{ needs.check-all.outputs.prowlarr-version }}
+          UNPACKERR_UPDATE: ${{ needs.check-all.outputs.unpackerr-update }}
+          UNPACKERR_VERSION: ${{ needs.check-all.outputs.unpackerr-version }}
         with:
           script: |
             const inputs = { push: 'true' };
             
-            if ('${{ needs.check-all.outputs.radarr-update }}' === 'true') {
-              inputs.radarr_version = '${{ needs.check-all.outputs.radarr-version }}';
+            if (process.env.RADARR_UPDATE === 'true') {
+              inputs.radarr_version = process.env.RADARR_VERSION;
             }
-            if ('${{ needs.check-all.outputs.sonarr-update }}' === 'true') {
-              inputs.sonarr_version = '${{ needs.check-all.outputs.sonarr-version }}';
+            if (process.env.SONARR_UPDATE === 'true') {
+              inputs.sonarr_version = process.env.SONARR_VERSION;
             }
-            if ('${{ needs.check-all.outputs.prowlarr-update }}' === 'true') {
-              inputs.prowlarr_version = '${{ needs.check-all.outputs.prowlarr-version }}';
+            if (process.env.PROWLARR_UPDATE === 'true') {
+              inputs.prowlarr_version = process.env.PROWLARR_VERSION;
             }
-            if ('${{ needs.check-all.outputs.unpackerr-update }}' === 'true') {
-              inputs.unpackerr_version = '${{ needs.check-all.outputs.unpackerr-version }}';
+            if (process.env.UNPACKERR_UPDATE === 'true') {
+              inputs.unpackerr_version = process.env.UNPACKERR_VERSION;
             }
             
             console.log('Triggering build with inputs:', inputs);

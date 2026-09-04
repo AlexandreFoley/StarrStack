@@ -20,6 +20,7 @@ fi
 app="$1"
 app_uid="$2"
 app_guid="$3"
+app_version="${4:-}"
 
 case $app in
 lidarr)
@@ -71,6 +72,12 @@ quit)
     ;;
 esac
 
+if [[ -n "$app_version" &&
+      ! "$app_version" =~ ^[0-9]+(\.[0-9]+){2,3}([.-][0-9A-Za-z.-]+)?$ ]]; then
+    echo "Invalid version: $app_version" >&2
+    exit 1
+fi
+
 # Constants
 installdir="/opt"
 bindir="${installdir}/${app^}"
@@ -111,27 +118,63 @@ ARCH=$(uname -m)
 # get arch
 
 if [ "$app" != "sonarr" ]; then
-    dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=${ARR_OS:-linux}&runtime=netcore"
-    case "$ARCH" in
-    "x86_64") DLURL="${dlbase}&arch=x64" ;;
-    "armv7l") DLURL="${dlbase}&arch=arm" ;;
-    "aarch64") DLURL="${dlbase}&arch=arm64" ;;
-    *)
-        echo "Arch not supported"
-        exit 1
-        ;;
-    esac
+    if [[ -n "$app_version" ]]; then
+        case "$ARCH" in
+        "x86_64") asset_arch="x64" ;;
+        "armv7l") asset_arch="arm" ;;
+        "aarch64") asset_arch="arm64" ;;
+        *)
+            echo "Arch not supported"
+            exit 1
+            ;;
+        esac
+        if [[ "${ARR_OS:-linux}" == "linuxmusl" ]]; then
+            asset_platform="linux-musl-core"
+        else
+            asset_platform="linux-core"
+        fi
+        DLURL="https://github.com/${app^}/${app^}/releases/download/v${app_version}/${app^}.${branch}.${app_version}.${asset_platform}-${asset_arch}.tar.gz"
+    else
+        dlbase="https://$app.servarr.com/v1/update/$branch/updatefile?os=${ARR_OS:-linux}&runtime=netcore"
+        case "$ARCH" in
+        "x86_64") DLURL="${dlbase}&arch=x64" ;;
+        "armv7l") DLURL="${dlbase}&arch=arm" ;;
+        "aarch64") DLURL="${dlbase}&arch=arm64" ;;
+        *)
+            echo "Arch not supported"
+            exit 1
+            ;;
+        esac
+    fi
 elif [ "$app" == "sonarr" ]; then
-    dlbase="https://services.sonarr.tv/v1/download/main/latest?version=4&os=${ARR_OS:-linux}"
-    case "$ARCH" in
-    "x86_64") DLURL="${dlbase}&arch=x64" ;;
-    "armv7l") DLURL="${dlbase}&arch=arm" ;;
-    "aarch64") DLURL="${dlbase}&arch=arm64" ;;
-    *)
-        echo "Arch not supported"
-        exit 1
-        ;;
-    esac
+    if [[ -n "$app_version" ]]; then
+        case "$ARCH" in
+        "x86_64") asset_arch="x64" ;;
+        "armv7l") asset_arch="arm" ;;
+        "aarch64") asset_arch="arm64" ;;
+        *)
+            echo "Arch not supported"
+            exit 1
+            ;;
+        esac
+        if [[ "${ARR_OS:-linux}" == "linuxmusl" ]]; then
+            asset_platform="linux-musl"
+        else
+            asset_platform="linux"
+        fi
+        DLURL="https://github.com/Sonarr/Sonarr/releases/download/v${app_version}/Sonarr.main.${app_version}.${asset_platform}-${asset_arch}.tar.gz"
+    else
+        dlbase="https://services.sonarr.tv/v1/download/main/latest?version=4&os=${ARR_OS:-linux}"
+        case "$ARCH" in
+        "x86_64") DLURL="${dlbase}&arch=x64" ;;
+        "armv7l") DLURL="${dlbase}&arch=arm" ;;
+        "aarch64") DLURL="${dlbase}&arch=arm64" ;;
+        *)
+            echo "Arch not supported"
+            exit 1
+            ;;
+        esac
+    fi
 else
     echo "Something went wrong"
 fi
