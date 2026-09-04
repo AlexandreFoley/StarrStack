@@ -88,10 +88,12 @@ jobs:
           validate_version "Unpackerr" "$UNPACKERR"
           echo "  Unpackerr: $UNPACKERR"
           
-          echo "radarr=$RADARR" >> "$GITHUB_OUTPUT"
-          echo "sonarr=$SONARR" >> "$GITHUB_OUTPUT"
-          echo "prowlarr=$PROWLARR" >> "$GITHUB_OUTPUT"
-          echo "unpackerr=$UNPACKERR" >> "$GITHUB_OUTPUT"
+          {
+            echo "radarr=$RADARR"
+            echo "sonarr=$SONARR"
+            echo "prowlarr=$PROWLARR"
+            echo "unpackerr=$UNPACKERR"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set lowercase repository name
         id: repo
@@ -107,6 +109,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -140,9 +144,13 @@ jobs:
 
       - name: Push AMD64 image
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_SHA: ${{ github.sha }}
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
         run: |
-          docker tag starrstack-test-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
-          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64
+          image="ghcr.io/${REPO_LOWER}:${IMAGE_SHA}-amd64"
+          docker tag "starrstack-test-amd64:${IMAGE_SHA}" "$image"
+          docker push "$image"
 
   build-arm64:
     needs: versions
@@ -156,6 +164,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -190,9 +200,13 @@ jobs:
 
       - name: Push ARM64 image
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_SHA: ${{ github.sha }}
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
         run: |
-          docker tag starrstack-test-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
-          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64
+          image="ghcr.io/${REPO_LOWER}:${IMAGE_SHA}-arm64"
+          docker tag "starrstack-test-arm64:${IMAGE_SHA}" "$image"
+          docker push "$image"
 
 
   build-alpine-amd64:
@@ -204,6 +218,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -237,9 +253,13 @@ jobs:
 
       - name: Push Alpine AMD64 image
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_SHA: ${{ github.sha }}
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
         run: |
-          docker tag starrstack-test-alpine-amd64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
-          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64
+          image="ghcr.io/${REPO_LOWER}:${IMAGE_SHA}-alpine-amd64"
+          docker tag "starrstack-test-alpine-amd64:${IMAGE_SHA}" "$image"
+          docker push "$image"
 
   build-alpine-arm64:
     needs: versions
@@ -253,6 +273,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
@@ -287,9 +309,13 @@ jobs:
 
       - name: Push Alpine ARM64 image
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_SHA: ${{ github.sha }}
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
         run: |
-          docker tag starrstack-test-alpine-arm64:${{ github.sha }} ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
-          docker push ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64
+          image="ghcr.io/${REPO_LOWER}:${IMAGE_SHA}-alpine-arm64"
+          docker tag "starrstack-test-alpine-arm64:${IMAGE_SHA}" "$image"
+          docker push "$image"
 
   manifest:
     needs: [versions, build-amd64, build-arm64, build-alpine-amd64, build-alpine-arm64]
@@ -310,42 +336,71 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create and push multi-arch manifest
+        env:
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
+          IMAGE_SHA: ${{ github.sha }}
+          RADARR_VERSION: ${{ needs.versions.outputs.radarr }}
+          SONARR_VERSION: ${{ needs.versions.outputs.sonarr }}
+          PROWLARR_VERSION: ${{ needs.versions.outputs.prowlarr }}
+          UNPACKERR_VERSION: ${{ needs.versions.outputs.unpackerr }}
+          ARM64_SUCCESS: ${{ needs.build-arm64.outputs.success }}
         run: |
+          repo="ghcr.io/${REPO_LOWER}"
+          sha="${IMAGE_SHA}"
+          radarr="${RADARR_VERSION}"
+          sonarr="${SONARR_VERSION}"
+          prowlarr="${PROWLARR_VERSION}"
+          unpackerr="${UNPACKERR_VERSION}"
+
           # Determine which images to include in manifest
-          IMAGES="ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-amd64"
+          IMAGES=("${repo}:${sha}-amd64")
           
-          if [ "${{ needs.build-arm64.outputs.success }}" == "true" ]; then
-            IMAGES="$IMAGES ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-arm64"
+          if [ "$ARM64_SUCCESS" == "true" ]; then
+            IMAGES+=("${repo}:${sha}-arm64")
             echo "Including both AMD64 and ARM64 in manifest"
           else
             echo "ARM64 build failed or was skipped, creating AMD64-only manifest"
           fi
           
           # Create manifest for SHA tag
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }} $IMAGES
+          docker buildx imagetools create -t "${repo}:${sha}" "${IMAGES[@]}"
           
           # Create manifest for version tag
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }} $IMAGES
+          docker buildx imagetools create -t "${repo}:radarr-${radarr}-sonarr-${sonarr}-prowlarr-${prowlarr}-unpackerr-${unpackerr}" "${IMAGES[@]}"
           
           # Create manifest for latest tag
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:latest $IMAGES
+          docker buildx imagetools create -t "${repo}:latest" "${IMAGES[@]}"
 
 
       - name: Create and push alpine multi-arch manifest
         if: needs.build-alpine-amd64.result == 'success'
+        env:
+          REPO_LOWER: ${{ needs.versions.outputs.repo_lower }}
+          IMAGE_SHA: ${{ github.sha }}
+          RADARR_VERSION: ${{ needs.versions.outputs.radarr }}
+          SONARR_VERSION: ${{ needs.versions.outputs.sonarr }}
+          PROWLARR_VERSION: ${{ needs.versions.outputs.prowlarr }}
+          UNPACKERR_VERSION: ${{ needs.versions.outputs.unpackerr }}
+          ARM64_SUCCESS: ${{ needs.build-alpine-arm64.outputs.success }}
         run: |
-          ALPINE_IMAGES="ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-amd64"
+          repo="ghcr.io/${REPO_LOWER}"
+          sha="${IMAGE_SHA}"
+          radarr="${RADARR_VERSION}"
+          sonarr="${SONARR_VERSION}"
+          prowlarr="${PROWLARR_VERSION}"
+          unpackerr="${UNPACKERR_VERSION}"
+          ALPINE_IMAGES=("${repo}:${sha}-alpine-amd64")
 
-          if [ "${{ needs.build-alpine-arm64.outputs.success }}" == "true" ]; then
-            ALPINE_IMAGES="$ALPINE_IMAGES ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine-arm64"
+          if [ "$ARM64_SUCCESS" == "true" ]; then
+            ALPINE_IMAGES+=("${repo}:${sha}-alpine-arm64")
             echo "Including both AMD64 and ARM64 in alpine manifest"
           else
             echo "Alpine ARM64 build failed or was skipped, creating AMD64-only alpine manifest"
           fi
 
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:${{ github.sha }}-alpine $ALPINE_IMAGES
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:radarr-${{ needs.versions.outputs.radarr }}-sonarr-${{ needs.versions.outputs.sonarr }}-prowlarr-${{ needs.versions.outputs.prowlarr }}-unpackerr-${{ needs.versions.outputs.unpackerr }}-alpine $ALPINE_IMAGES
-          docker buildx imagetools create -t ghcr.io/${{ needs.versions.outputs.repo_lower }}:alpine $ALPINE_IMAGES
+          docker buildx imagetools create -t "${repo}:${sha}-alpine" "${ALPINE_IMAGES[@]}"
+          docker buildx imagetools create -t "${repo}:radarr-${radarr}-sonarr-${sonarr}-prowlarr-${prowlarr}-unpackerr-${unpackerr}-alpine" "${ALPINE_IMAGES[@]}"
+          docker buildx imagetools create -t "${repo}:alpine" "${ALPINE_IMAGES[@]}"
 
   release:
     needs: [versions, manifest, build-arm64, build-alpine-amd64, build-alpine-arm64]

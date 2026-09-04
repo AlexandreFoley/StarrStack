@@ -12,27 +12,6 @@ permissions:
 jobs:
   check-all:
     runs-on: ubuntu-latest
-    env:
-      CHECK_FUNCTION: |
-        check_service() {
-          local NAME=$1
-          local URL=$2
-          local LAST_CHECK=$3
-          RELEASE=$(curl -s "$URL")
-          LATEST=$(echo "$RELEASE" | jq -r '.tag_name | gsub("^v"; "")')
-          PUBLISHED=$(echo "$RELEASE" | jq -r '.published_at')
-          
-          echo "latest-version=$LATEST" >> "$GITHUB_OUTPUT"
-          echo "published-at=$PUBLISHED" >> "$GITHUB_OUTPUT"
-          
-          if [[ "$PUBLISHED" > "$LAST_CHECK" ]]; then
-            echo "needs-update=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "needs-update=false" >> "$GITHUB_OUTPUT"
-            echo "$NAME $LATEST is older than last check"
-          fi
-          echo "$NAME $LATEST (published: $PUBLISHED)"
-        }
     outputs:
       radarr-version: ${{ steps.check-radarr.outputs.latest-version }}
       radarr-update: ${{ steps.check-radarr.outputs.needs-update }}
@@ -46,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Calculate check window
         id: window
@@ -57,51 +38,68 @@ jobs:
 
       - name: Check Radarr
         id: check-radarr
+        env:
+          LAST_CHECK: ${{ steps.window.outputs.last-check }}
         run: |
-          ${{ env.CHECK_FUNCTION }}
-          check_service "Radarr" "https://api.github.com/repos/Radarr/Radarr/releases/latest" "${{ steps.window.outputs.last-check }}"
+          bash .github/scripts/check-service.sh \
+            "Radarr" "https://api.github.com/repos/Radarr/Radarr/releases/latest" "$LAST_CHECK"
 
       - name: Check Sonarr
         id: check-sonarr
+        env:
+          LAST_CHECK: ${{ steps.window.outputs.last-check }}
         run: |
-          ${{ env.CHECK_FUNCTION }}
-          check_service "Sonarr" "https://api.github.com/repos/Sonarr/Sonarr/releases/latest" "${{ steps.window.outputs.last-check }}"
+          bash .github/scripts/check-service.sh \
+            "Sonarr" "https://api.github.com/repos/Sonarr/Sonarr/releases/latest" "$LAST_CHECK"
 
       - name: Check Prowlarr
         id: check-prowlarr
+        env:
+          LAST_CHECK: ${{ steps.window.outputs.last-check }}
         run: |
-          ${{ env.CHECK_FUNCTION }}
-          check_service "Prowlarr" "https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest" "${{ steps.window.outputs.last-check }}"
+          bash .github/scripts/check-service.sh \
+            "Prowlarr" "https://api.github.com/repos/Prowlarr/Prowlarr/releases/latest" "$LAST_CHECK"
 
       - name: Check Unpackerr
         id: check-unpackerr
+        env:
+          LAST_CHECK: ${{ steps.window.outputs.last-check }}
         run: |
-          ${{ env.CHECK_FUNCTION }}
-          check_service "Unpackerr" "https://api.github.com/repositories/132426524/releases/latest" "${{ steps.window.outputs.last-check }}"
+          bash .github/scripts/check-service.sh \
+            "Unpackerr" "https://api.github.com/repositories/132426524/releases/latest" "$LAST_CHECK"
 
       - name: Summarize updates
         id: summary
+        env:
+          RADARR_UPDATE: ${{ steps.check-radarr.outputs.needs-update }}
+          RADARR_VERSION: ${{ steps.check-radarr.outputs.latest-version }}
+          SONARR_UPDATE: ${{ steps.check-sonarr.outputs.needs-update }}
+          SONARR_VERSION: ${{ steps.check-sonarr.outputs.latest-version }}
+          PROWLARR_UPDATE: ${{ steps.check-prowlarr.outputs.needs-update }}
+          PROWLARR_VERSION: ${{ steps.check-prowlarr.outputs.latest-version }}
+          UNPACKERR_UPDATE: ${{ steps.check-unpackerr.outputs.needs-update }}
+          UNPACKERR_VERSION: ${{ steps.check-unpackerr.outputs.latest-version }}
         run: |
           set -euo pipefail
 
           any=false
           updates=()
 
-          if [[ "${{ steps.check-radarr.outputs.needs-update }}" == "true" ]]; then
+          if [[ "$RADARR_UPDATE" == "true" ]]; then
             any=true
-            updates+=("  - Radarr: ${{ steps.check-radarr.outputs.latest-version }}")
+            updates+=("  - Radarr: $RADARR_VERSION")
           fi
-          if [[ "${{ steps.check-sonarr.outputs.needs-update }}" == "true" ]]; then
+          if [[ "$SONARR_UPDATE" == "true" ]]; then
             any=true
-            updates+=("  - Sonarr: ${{ steps.check-sonarr.outputs.latest-version }}")
+            updates+=("  - Sonarr: $SONARR_VERSION")
           fi
-          if [[ "${{ steps.check-prowlarr.outputs.needs-update }}" == "true" ]]; then
+          if [[ "$PROWLARR_UPDATE" == "true" ]]; then
             any=true
-            updates+=("  - Prowlarr: ${{ steps.check-prowlarr.outputs.latest-version }}")
+            updates+=("  - Prowlarr: $PROWLARR_VERSION")
           fi
-          if [[ "${{ steps.check-unpackerr.outputs.needs-update }}" == "true" ]]; then
+          if [[ "$UNPACKERR_UPDATE" == "true" ]]; then
             any=true
-            updates+=("  - Unpackerr: ${{ steps.check-unpackerr.outputs.latest-version }}")
+            updates+=("  - Unpackerr: $UNPACKERR_VERSION")
           fi
 
           echo "any-updates=$any" >> "$GITHUB_OUTPUT"
