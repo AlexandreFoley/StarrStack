@@ -5,10 +5,9 @@ name: Test
 #   - skip: a paths-filter job gates each variant; a variant (and its tests)
 #     only runs when something it depends on changed. 'schedule' and manual
 #     dispatch always run both (they exist to catch upstream version bumps).
-#   - cache: builds use buildah's registry-backed build cache (--cache-from/
-#     --cache-to) pointing at short-lived GHCR tags per variant. Set GHCR
-#     package retention (Settings > Packages) to ~7 days for the two
-#     build-cache-* packages to keep the cache short-lived.
+#   - cache: builds use BuildKit's GitHub Actions cache backend with a
+#     pull-request-specific scope. PR jobs never receive a GHCR write token,
+#     and trusted main builds use a separate cache scope.
 # No custom runner image needed: the podman python SDK connects to the rootless
 # socket at $XDG_RUNTIME_DIR/podman/podman.sock (see tests/conftest.py).
 #
@@ -26,7 +25,6 @@ on:
 
 permissions:
   contents: read
-  packages: write   # push build-cache images to GHCR
 
 jobs:
   changes:
@@ -37,9 +35,11 @@ jobs:
       alpine: ${{ steps.filter.outputs.alpine }}
       tests: ${{ steps.filter.outputs.tests }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: dorny/paths-filter@v4
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -78,18 +78,67 @@ jobs:
     env:
       VARIANT: ubi
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
-    steps: &test-steps
-      - uses: actions/checkout@v7
+      PREBUILT_IMAGE: starr-test-ubi:latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Compute GHCR build-cache repository (registry names must be
-          lowercase; github.repository is not)
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve service versions
+        id: versions
         run: |
-          cache_repo="ghcr.io/${GITHUB_REPOSITORY,,}/build-cache-${VARIANT}"
-          echo "PODMAN_BUILD_CACHE_FROM=${cache_repo}" >> "$GITHUB_ENV"
-          echo "PODMAN_BUILD_CACHE_TO=${cache_repo}" >> "$GITHUB_ENV"
-          echo "cache repo: ${cache_repo}"
+          set -euo pipefail
+          for service in radarr sonarr prowlarr unpackerr; do
+            case "$service" in
+              radarr) api_path="repos/Radarr/Radarr" ;;
+              sonarr) api_path="repos/Sonarr/Sonarr" ;;
+              prowlarr) api_path="repos/Prowlarr/Prowlarr" ;;
+              unpackerr) api_path="repositories/132426524" ;;
+            esac
+            version="$(curl -fsSL "https://api.github.com/$api_path/releases/latest" |
+              jq -r '.tag_name | gsub("^v"; "")')"
+            if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){2,3}([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid $service version: $version" >&2
+              exit 1
+            fi
+            echo "$service=$version" >> "$GITHUB_OUTPUT"
+          done
 
-      - uses: actions/setup-python@v7
+      - name: Build UBI image with PR-scoped Actions cache
+        if: env.VARIANT == 'ubi'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./ubi.dockerfile
+          load: true
+          tags: starr-test-ubi:latest
+          build-args: |
+            RADARR_VERSION=${{ steps.versions.outputs.radarr }}
+            SONARR_VERSION=${{ steps.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ steps.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ steps.versions.outputs.unpackerr }}
+          cache-from: type=gha,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-ubi
+          cache-to: type=gha,mode=max,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-ubi
+
+      - name: Build Alpine image with PR-scoped Actions cache
+        if: env.VARIANT == 'alpine'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./alpine.dockerfile
+          load: true
+          tags: starr-test-alpine:latest
+          build-args: |
+            RADARR_VERSION=${{ steps.versions.outputs.radarr }}
+            SONARR_VERSION=${{ steps.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ steps.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ steps.versions.outputs.unpackerr }}
+          cache-from: type=gha,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-alpine
+          cache-to: type=gha,mode=max,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-alpine
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
 
@@ -113,16 +162,21 @@ jobs:
           nohup podman system service --time=0 \
             "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
             >/tmp/podman-service.log 2>&1 &
-          for i in $(seq 1 20); do
+          for attempt in $(seq 1 20); do
             [ -S "$XDG_RUNTIME_DIR/podman/podman.sock" ] && break
+            echo "waiting for Podman socket (attempt $attempt/20)"
             sleep 1
           done
           ls -l "$XDG_RUNTIME_DIR/podman/podman.sock"
 
-      - name: Login to GHCR (build cache push)
+      - name: Install Podman
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ghcr.io \
-            -u "${{ github.actor }}" --password-stdin
+          sudo apt-get update
+          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          podman version
+
+      - name: Load BuildKit image into Podman
+        run: docker save "$PREBUILT_IMAGE" | podman load
 
       - name: Install python deps
         run: pip install -r requirements-test.txt
@@ -141,4 +195,88 @@ jobs:
     env:
       VARIANT: alpine
       XDG_RUNTIME_DIR: /run/user/1001   # runner user on ubuntu-latest
-    steps: *test-steps
+      PREBUILT_IMAGE: starr-test-alpine:latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve service versions
+        id: versions
+        run: |
+          set -euo pipefail
+          for service in radarr sonarr prowlarr unpackerr; do
+            case "$service" in
+              radarr) api_path="repos/Radarr/Radarr" ;;
+              sonarr) api_path="repos/Sonarr/Sonarr" ;;
+              prowlarr) api_path="repos/Prowlarr/Prowlarr" ;;
+              unpackerr) api_path="repositories/132426524" ;;
+            esac
+            version="$(curl -fsSL "https://api.github.com/$api_path/releases/latest" |
+              jq -r '.tag_name | gsub("^v"; "")')"
+            if [[ ! "$version" =~ ^[0-9]+(\.[0-9]+){2,3}([.-][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Invalid $service version: $version" >&2
+              exit 1
+            fi
+            echo "$service=$version" >> "$GITHUB_OUTPUT"
+          done
+
+      - name: Build Alpine image with PR-scoped Actions cache
+        if: env.VARIANT == 'alpine'
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./alpine.dockerfile
+          load: true
+          tags: starr-test-alpine:latest
+          build-args: |
+            RADARR_VERSION=${{ steps.versions.outputs.radarr }}
+            SONARR_VERSION=${{ steps.versions.outputs.sonarr }}
+            PROWLARR_VERSION=${{ steps.versions.outputs.prowlarr }}
+            UNPACKERR_VERSION=${{ steps.versions.outputs.unpackerr }}
+          cache-from: type=gha,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-alpine
+          cache-to: type=gha,mode=max,scope=pr-${{ github.event.pull_request.number || 'trusted' }}-alpine
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Install rootless podman toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          if ! grep -q "^$USER:" /etc/subuid; then
+            sudo sh -c 'echo "$USER:100000:65536" >> /etc/subuid'
+            sudo sh -c 'echo "$USER:100000:65536" >> /etc/subgid'
+          fi
+          podman version
+
+      - name: Start rootless podman service (SDK socket)
+        run: |
+          mkdir -p "$XDG_RUNTIME_DIR/podman"
+          nohup podman system service --time=0 \
+            "unix://$XDG_RUNTIME_DIR/podman/podman.sock" \
+            >/tmp/podman-service.log 2>&1 &
+          for attempt in $(seq 1 20); do
+            [ -S "$XDG_RUNTIME_DIR/podman/podman.sock" ] && break
+            echo "waiting for Podman socket (attempt $attempt/20)"
+            sleep 1
+          done
+          ls -l "$XDG_RUNTIME_DIR/podman/podman.sock"
+
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          podman version
+
+      - name: Load BuildKit image into Podman
+        run: docker save "$PREBUILT_IMAGE" | podman load
+
+      - name: Install python deps
+        run: pip install -r requirements-test.txt
+
+      - name: Run the suite for ${{ env.VARIANT }}
+        run: make test-${{ env.VARIANT }}

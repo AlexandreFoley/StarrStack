@@ -26,21 +26,21 @@ COPY scripts/arrstack-install.sh /arrstack-install.sh
 FROM builder-base AS radarr-builder
 ARG RADARR_VERSION
 RUN echo "Building Radarr ${RADARR_VERSION}" && \
-    ARR_OS=linuxmusl bash arrstack-install.sh radarr radarr root && \
+    ARR_OS=linuxmusl bash arrstack-install.sh radarr radarr root "${RADARR_VERSION}" && \
     rm -rf /opt/Radarr/Radarr.Update
 
 # Stage 3: Download and build Sonarr
 FROM builder-base AS sonarr-builder
 ARG SONARR_VERSION
 RUN echo "Building Sonarr ${SONARR_VERSION}" && \
-    ARR_OS=linuxmusl bash arrstack-install.sh sonarr sonarr root && \
+    ARR_OS=linuxmusl bash arrstack-install.sh sonarr sonarr root "${SONARR_VERSION}" && \
     rm -rf /opt/Sonarr/Sonarr.Update
 
 # Stage 4: Download and build Prowlarr
 FROM builder-base AS prowlarr-builder
 ARG PROWLARR_VERSION
 RUN echo "Building Prowlarr ${PROWLARR_VERSION}" && \
-    ARR_OS=linuxmusl bash arrstack-install.sh prowlarr prowlarr root && \
+    ARR_OS=linuxmusl bash arrstack-install.sh prowlarr prowlarr root "${PROWLARR_VERSION}" && \
     rm -rf /opt/Prowlarr/Prowlarr.Update
 
 # Stage 5: Download and build Unpackerr (static Go binary; no Alpine package exists).

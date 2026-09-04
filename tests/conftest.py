@@ -61,6 +61,12 @@ def build_image(variant):
     """Build the image for the given variant, streaming output to stdout.
     CLI build because the sdk offers no easy way to stream build progress.
     """
+    # CI can build with BuildKit so its GitHub Actions cache backend is
+    # available. The resulting image is loaded into Podman before pytest.
+    if os.environ.get("PREBUILT_IMAGE"):
+        print(f"container: using prebuilt image {tag_for(variant)}", flush=True)
+        return
+
     cmd = ["podman", "build", "--file", DOCKERFILES[variant], "--tag", tag_for(variant), str(REPO_ROOT)]
     # Registry-backed build cache (buildah's OCI cache images). CI sets
     # PODMAN_BUILD_CACHE_FROM/TO to a short-lived GHCR tag per variant, so
