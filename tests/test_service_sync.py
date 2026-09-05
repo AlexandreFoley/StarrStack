@@ -158,6 +158,19 @@ def test_no_systemd_parity_cargo_in_alpine_image():
     assert "COPY --from=consolidator /etc/systemd/system" not in dockerfile
 
 
+def test_api_keys_are_not_baked_into_images():
+    """Missing keys are generated at startup, never shipped as an image
+    default that every container would share."""
+    for variant in ("ubi", "alpine"):
+        dockerfile = (REPO_ROOT / f"{variant}.dockerfile").read_text()
+        assert "__AUTH__APIKEY" not in dockerfile
+
+
+def test_configure_indexers_has_no_public_key_fallback():
+    script = (REPO_ROOT / "scripts" / "configure-indexers.sh").read_text()
+    assert "c59b53c7cb39521ead0c0dbc1a61a401" not in script
+
+
 # ── Self-checks: the checker itself must catch drift ────────────────
 
 _GOOD_UNIT = """\
@@ -221,6 +234,15 @@ def test_checker_accepts_matching_pair():
          "uses supervise-daemon"),
         (_GOOD_UNIT, _GOOD_INITD + '\ncommand_user="thesvc:root"',
          "runs as root"),
+    ],
+    ids=[
+        "missing-failure-marker",
+        "wrong-umask",
+        "missing-dependency",
+        "wrong-command-args",
+        "wrong-executable",
+        "wrong-supervisor",
+        "wrong-user",
     ],
 )
 def test_checker_flags_drift(unit, initd, needle):

@@ -141,18 +141,16 @@ VOLUME ["/config","/media"]
 
 EXPOSE 7878 8989 9696
 
-# Environment variables for arr services
-ENV RADARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
-    RADARR__AUTH__ENABLED="true" \
+# Environment variables for arr services. API keys are generated at runtime
+# when they are not supplied explicitly.
+ENV RADARR__AUTH__ENABLED="true" \
     RADARR__SERVER__URLBASE="" \
     RADARR__SERVER__PORT="7878" \
     RADARR__AUTH__METHOD="Forms" \
-    SONARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     SONARR__AUTH__ENABLED="true" \
     SONARR__SERVER__URLBASE="" \
     SONARR__SERVER__PORT="8989" \
     SONARR__AUTH__METHOD="Forms" \
-    PROWLARR__AUTH__APIKEY="c59b53c7cb39521ead0c0dbc1a61a401" \
     PROWLARR__AUTH__ENABLED="true" \
     PROWLARR__SERVER__URLBASE="" \
     PROWLARR__SERVER__PORT="9696" \

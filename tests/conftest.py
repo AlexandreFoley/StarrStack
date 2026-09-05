@@ -149,3 +149,31 @@ def running_container(podman_client:PodmanClient, built_image, api_key, variant)
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+
+
+@pytest.fixture(scope="session")
+def generated_key_container(podman_client: PodmanClient, built_image, variant):
+    """Start a container without API keys and yield its name for exec checks."""
+    name = f"starr-generated-{variant}-{uuid.uuid4()}"
+    run_kwargs = dict(
+        detach=True,
+        tty=True,
+        name=name,
+        environment={
+            "RADARR__SERVER__PORT": "7878",
+            "SONARR__SERVER__PORT": "8989",
+            "PROWLARR__SERVER__PORT": "9696",
+        },
+    )
+    if variant == "alpine":
+        run_kwargs["systemd"] = "false"
+    try:
+        podman_client.containers.run(built_image, **run_kwargs)
+        yield name
+    finally:
+        subprocess.run(
+            ["podman", "rm", "-f", name],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )

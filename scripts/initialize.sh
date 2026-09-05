@@ -1,19 +1,17 @@
 #!/bin/bash
 # Initialize container: fix permissions and create environment files for services
-# Services can only access their own config directories
+# Services can only access their own config directories.
 
 set -e
 
 echo "Initializing container..."
 
-# Validate required environment variables
+# Validate required environment variables. API keys are generated below when
+# they were not supplied by the container runtime.
 MISSING_VARS=()
 
-[ -z "$RADARR__AUTH__APIKEY" ] && MISSING_VARS+=("RADARR__AUTH__APIKEY")
 [ -z "$RADARR__SERVER__PORT" ] && MISSING_VARS+=("RADARR__SERVER__PORT")
-[ -z "$SONARR__AUTH__APIKEY" ] && MISSING_VARS+=("SONARR__AUTH__APIKEY")
 [ -z "$SONARR__SERVER__PORT" ] && MISSING_VARS+=("SONARR__SERVER__PORT")
-[ -z "$PROWLARR__AUTH__APIKEY" ] && MISSING_VARS+=("PROWLARR__AUTH__APIKEY")
 [ -z "$PROWLARR__SERVER__PORT" ] && MISSING_VARS+=("PROWLARR__SERVER__PORT")
 
 if [ ${#MISSING_VARS[@]} -gt 0 ]; then
@@ -23,7 +21,6 @@ if [ ${#MISSING_VARS[@]} -gt 0 ]; then
     done
     echo ""
     echo "All arr services require the following environment variables:"
-    echo "  *__AUTH__APIKEY"
     echo "  *__SERVER__PORT"
     echo "  *__SERVER__URLBASE (optional)"
     exit 1
@@ -54,10 +51,61 @@ else
     echo "  *** Use UMASK=002 on your download client (the qbittorrent unit already does)."
 fi
 
+# Resolve the stack's API key from the runtime environment. Keep this
+# deliberately ephemeral: users who need a stable key can provide one.
+API_KEY="${RADARR__AUTH__APIKEY:-${SONARR__AUTH__APIKEY:-${PROWLARR__AUTH__APIKEY:-}}}"
+if [ -z "$API_KEY" ]; then
+    API_KEY=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+fi
+
+RADARR__AUTH__APIKEY="${RADARR__AUTH__APIKEY:-$API_KEY}"
+SONARR__AUTH__APIKEY="${SONARR__AUTH__APIKEY:-$API_KEY}"
+PROWLARR__AUTH__APIKEY="${PROWLARR__AUTH__APIKEY:-$API_KEY}"
+
+if [ -d /run/systemd/system ]; then
+    # systemd services receive container variables through PassEnvironment.
+    # set-environment updates PID 1's environment without creating a secrets
+    # file, so generated keys remain ephemeral.
+    systemctl set-environment \
+        RADARR__AUTH__APIKEY="$RADARR__AUTH__APIKEY" \
+        SONARR__AUTH__APIKEY="$SONARR__AUTH__APIKEY" \
+        PROWLARR__AUTH__APIKEY="$PROWLARR__AUTH__APIKEY"
+else
+    # PID 1 harvested the original container environment before initialize
+    # started. Add generated values to the per-service env files it created.
+    for svc in radarr sonarr prowlarr; do
+        case "$svc" in
+            radarr)    var=RADARR__AUTH__APIKEY ;;
+            sonarr)    var=SONARR__AUTH__APIKEY ;;
+            prowlarr)  var=PROWLARR__AUTH__APIKEY ;;
+        esac
+        printf 'export %s=%s\n' "$var" "'${!var}'" >> "/etc/conf.d/$svc"
+        chmod 600 "/etc/conf.d/$svc"
+    done
+
+    for svc in initialize configure-indexers configure-downloadclients; do
+        for var in RADARR__AUTH__APIKEY SONARR__AUTH__APIKEY PROWLARR__AUTH__APIKEY; do
+            printf 'export %s=%s\n' "$var" "'${!var}'" >> "/etc/conf.d/$svc"
+        done
+        chmod 600 "/etc/conf.d/$svc"
+    done
+
+    svc=unpackerr
+    {
+        printf "export UN_RADARR_0_API_KEY='%s'\n" "$RADARR__AUTH__APIKEY"
+        printf "export UN_RADARR_0_URL='%s'\n" \
+            "http://127.0.0.1:${RADARR__SERVER__PORT}${RADARR__SERVER__URLBASE}"
+        printf "export UN_SONARR_0_API_KEY='%s'\n" "$SONARR__AUTH__APIKEY"
+        printf "export UN_SONARR_0_URL='%s'\n" \
+            "http://127.0.0.1:${SONARR__SERVER__PORT}${SONARR__SERVER__URLBASE}"
+    } >> "/etc/conf.d/$svc"
+    chmod 600 "/etc/conf.d/$svc"
+fi
+
 # systemd build only (ubi). Unpackerr's UN_* env is a systemd drop-in there.
 # On the OpenRC build (alpine) the container runtime env is harvested
 # per-service into /etc/conf.d/<service> by container-init.sh (PID 1), which
-# openrc-run sources for that service alone - so none of this applies.
+# openrc-run sources for that service alone; generated values are appended above.
 if [ -d /run/systemd/system ]; then
     cat > /etc/systemd/system/unpackerr.service.d/environment.conf <<EOF
 [Service]

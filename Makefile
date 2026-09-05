@@ -18,7 +18,7 @@ test-ubi: venv
 	VARIANT=ubi .venv/bin/pytest tests/ -v -ra -s
 
 test-alpine: venv
-	VARIANT=alpine .venv/bin/pytest tests/test_basic.py tests/test_quadlet.py tests/test_service_sync.py -v -ra -s
+	VARIANT=alpine .venv/bin/pytest tests/test_basic.py tests/test_generated_api_keys.py tests/test_quadlet.py tests/test_service_sync.py -v -ra -s
 
 test-static: venv
 	.venv/bin/pytest tests/test_quadlet.py tests/test_basic.py -v -ra -s

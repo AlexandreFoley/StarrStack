@@ -19,18 +19,21 @@ Environment=RADARR__AUTH__ENABLED=true
 Environment=RADARR__SERVER__URLBASE=
 Environment=RADARR__SERVER__PORT=7878
 Environment=RADARR__AUTH__METHOD=External
+# Environment=RADARR__AUTH__APIKEY=
 Secret=radarr_apikey,type=env,target=RADARR__AUTH__APIKEY
 
 Environment=SONARR__AUTH__ENABLED=true
 Environment=SONARR__SERVER__URLBASE=
 Environment=SONARR__SERVER__PORT=8989
 Environment=SONARR__AUTH__METHOD=External
+# Environment=SONARR__AUTH__APIKEY=
 Secret=sonarr_apikey,type=env,target=SONARR__AUTH__APIKEY
 
 Environment=PROWLARR__AUTH__ENABLED=true
 Environment=PROWLARR__SERVER__URLBASE=
 Environment=PROWLARR__SERVER__PORT=9696
 Environment=PROWLARR__AUTH__METHOD=External
+# Environment=PROWLARR__AUTH__APIKEY=
 Secret=prowlarr_apikey,type=env,target=PROWLARR__AUTH__APIKEY
 
 Environment=TORRENT_CLIENT=qbittorrent

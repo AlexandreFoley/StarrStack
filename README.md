@@ -10,7 +10,7 @@ A disk-space optimized Podman/Docker image containing Radarr, Sonarr, Prowlarr, 
 A **Single unified container**: All 4 services run together under systemd init. This allow:
 
 - **Lightweight**: Deduplication of identical files across the arr apps.
-- **Pre-configured**: Ready to run with sensible defaults. But change the API key!
+- **Pre-configured**: Ready to run with sensible defaults. API keys are randomly generated on first start when not supplied.
 - **Auto-configured**:  The shared context of the container is used to configure prowlarr and unpackerr interactions with sonarr and radarr.
 - **Torrent client configuration**: Torrent client configuration can be provided as environment variables, they will be applied to sonarr and radarr automatically.
 
@@ -70,13 +70,13 @@ Advanced configuration can be done from within the individual apps.
 
 #### Authentication Settings
 
-All services use the same API key by default and have Forms authentication enabled. Override individually if needed:
+All services use the same randomly generated API key by default and have Forms authentication enabled. Set the variables explicitly if a stable key is needed:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RADARR__AUTH__APIKEY` | `c59b53...` | Radarr API key (32-char hex) |
-| `SONARR__AUTH__APIKEY` | `c59b53...` | Sonarr API key (32-char hex) |
-| `PROWLARR__AUTH__APIKEY` | `c59b53...` | Prowlarr API key (32-char hex) |
+| `RADARR__AUTH__APIKEY` | random | Radarr API key (32-char hex) |
+| `SONARR__AUTH__APIKEY` | random | Sonarr API key (32-char hex) |
+| `PROWLARR__AUTH__APIKEY` | random | Prowlarr API key (32-char hex) |
 | `RADARR__AUTH__ENABLED` | `true` | Enable auth in Radarr |
 | `SONARR__AUTH__ENABLED` | `true` | Enable auth in Sonarr |
 | `PROWLARR__AUTH__ENABLED` | `true` | Enable auth in Prowlarr |
@@ -136,8 +136,8 @@ Volume=%h/containers/starr/config:/config:Z
 Volume=%h/containers/starr/media:/media:Z
 
 # Environment variables (override defaults as needed)
-Environment="RADARR__AUTH__APIKEY=your-custom-radarr-key"
-Environment="SONARR__AUTH__APIKEY=your-custom-sonarr-key"
+# Environment="RADARR__AUTH__APIKEY="
+# Environment="SONARR__AUTH__APIKEY="
 Environment="RADARR__AUTH__ENABLED=true"
 Environment="SONARR__AUTH__ENABLED=true"
 Environment="RADARR__AUTH__METHOD=Forms"
@@ -286,7 +286,7 @@ Inside the container:
    - `Basic`: Browser pop-up
    - `None`: No authentication (not recommended for public access)
 
-4. **API Key Format**: Must be a 32-character hexadecimal string (e.g., `c59b53c7cb39521ead0c0dbc1a61a401`)
+4. **API Key Format**: Must be a 32-character hexadecimal string.
 
 5. **First Run**: On first start, services may take 30-60 seconds to initialize. Check logs with `podman logs starr`.
 
