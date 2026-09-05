@@ -125,7 +125,8 @@ trap 'openrc shutdown 2>/dev/null; exit 143' TERM INT
 while :; do wait; done
 ```
 
-Verified: a container with empty `RADARR__AUTH__APIKEY` exits on its own (`Exited (1)`).
+API keys are optional: an empty `RADARR__AUTH__APIKEY` is replaced with a
+runtime-generated key.
 
 ## Build & smoke test
 
@@ -150,5 +151,5 @@ podman logs -f starr-alpine-test
 | configure-indexers | full success: connected to all three apps, added Radarr-autoconf + Sonarr-autoconf to Prowlarr, triggered sync |
 | unpackerr env | `UN_RADARR_0_URL`, `UN_RADARR_0_API_KEY`, `UN_SONARR_0_*` present in the daemon's environment (drop-in eval works) |
 | unpackerr connectivity | ESTABLISHED connection to Radarr on :7878 observed |
-| failure-stop | container with empty API keys self-exits `Exited (1)` with the "stopping container" message |
+| failure-stop | required startup failures self-exit `Exited (1)` with the "stopping container" message |
 | ubi size comparison | done: 809 MB (alpine) vs 1.08 GB (ubi9) |
