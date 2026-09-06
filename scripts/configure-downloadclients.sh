@@ -93,6 +93,7 @@ wait_for_service() {
 get_client_config() {
     local client_type=$1
     local category=$2
+    local category_field=$3
     local client_name="${client_type^}"
     
     # Client-specific configurations
@@ -205,7 +206,7 @@ EOF
             "value": "${TORRENT_PASSWORD}"
         },
         {
-            "name": "movieCategory",
+            "name": "${category_field}",
             "value": "${category}"
         },
 ${extra_fields}
@@ -218,13 +219,18 @@ ${extra_fields}
 EOF
 }
 
-# Function to add download client to Radarr
-add_downloadclient_to_radarr() {
+# Function to add a download client to an arr service
+add_downloadclient() {
+    local service_name=$1
+    local service_url=$2
+    local api_key=$3
+    local category=$4
+    local category_field=$5
     local client_name="${TORRENT_CLIENT^}-autoconf"
-    echo -n "Adding ${client_name} to Radarr..."
+    echo -n "Adding ${client_name} to ${service_name}..."
     
     # Check if download client already exists by name
-    existing=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/downloadclient" | \
+    existing=$(curl -s -H "X-Api-Key: $api_key" "$service_url/api/v3/downloadclient" | \
                jq -r ".[] | select(.name == \"${client_name}\") | .id")
     
     if [ -n "$existing" ]; then
@@ -233,48 +239,14 @@ add_downloadclient_to_radarr() {
     fi
     
     # Get config
-    config=$(get_client_config "${TORRENT_CLIENT,,}" "$TORRENT_CATEGORY_MOVIES")
+    config=$(get_client_config "${TORRENT_CLIENT,,}" "$category" "$category_field")
     
     # Add download client
     response=$(curl -s -X POST \
         -H "Content-Type: application/json" \
-        -H "X-Api-Key: $RADARR_API_KEY" \
+        -H "X-Api-Key: $api_key" \
         -d "$config" \
-        "$RADARR_URL/api/v3/downloadclient")
-    
-    if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
-        echo -e " ${GREEN}✓${NC}"
-        return 0
-    else
-        echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Error response: $response${NC}"
-        return 1
-    fi
-}
-
-# Function to add download client to Sonarr
-add_downloadclient_to_sonarr() {
-    local client_name="${TORRENT_CLIENT^}-autoconf"
-    echo -n "Adding ${client_name} to Sonarr..."
-    
-    # Check if download client already exists by name
-    existing=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/downloadclient" | \
-               jq -r ".[] | select(.name == \"${client_name}\") | .id")
-    
-    if [ -n "$existing" ]; then
-        echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
-        return 0
-    fi
-    
-    # Get config
-    config=$(get_client_config "${TORRENT_CLIENT,,}" "$TORRENT_CATEGORY_TV")
-    
-    # Add download client
-    response=$(curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -H "X-Api-Key: $SONARR_API_KEY" \
-        -d "$config" \
-        "$SONARR_URL/api/v3/downloadclient")
+        "$service_url/api/v3/downloadclient")
     
     if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
         echo -e " ${GREEN}✓${NC}"
@@ -315,18 +287,23 @@ ensure_root_directory_exists() {
     return 0
 }
 
-# Function to configure root directory for Radarr
-configure_root_directory_radarr() {
+# Function to configure a root directory for an arr service
+configure_root_directory() {
+    local service_name=$1
+    local service_url=$2
+    local api_key=$3
+    local root_dir=$4
+
     # Ensure the directory exists on filesystem first
-    ensure_root_directory_exists "$RADARR_ROOT_DIR" "Radarr" || return 1
+    ensure_root_directory_exists "$root_dir" "$service_name" || return 1
     
-    echo -n "Configuring root directory for Radarr..."
+    echo -n "Configuring root directory for ${service_name}..."
     
     # Get existing root directories
-    existing_dirs=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/rootfolder")
+    existing_dirs=$(curl -s -H "X-Api-Key: $api_key" "$service_url/api/v3/rootfolder")
     
     # Check if the default root directory already exists
-    if echo "$existing_dirs" | jq -e ".[] | select(.path == \"${RADARR_ROOT_DIR}\")" > /dev/null 2>&1; then
+    if echo "$existing_dirs" | jq -e ".[] | select(.path == \"${root_dir}\")" > /dev/null 2>&1; then
         echo -e " ${YELLOW}Already configured${NC}"
         return 0
     fi
@@ -334,9 +311,9 @@ configure_root_directory_radarr() {
     # Add the root directory
     response=$(curl -s -X POST \
         -H "Content-Type: application/json" \
-        -H "X-Api-Key: $RADARR_API_KEY" \
-        -d "{\"path\": \"${RADARR_ROOT_DIR}\"}" \
-        "$RADARR_URL/api/v3/rootfolder")
+        -H "X-Api-Key: $api_key" \
+        -d "{\"path\": \"${root_dir}\"}" \
+        "$service_url/api/v3/rootfolder")
     
     if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
         echo -e " ${GREEN}✓${NC}"
@@ -348,53 +325,27 @@ configure_root_directory_radarr() {
     fi
 }
 
-# Function to configure root directory for Sonarr
-configure_root_directory_sonarr() {
-    # Ensure the directory exists on filesystem first
-    ensure_root_directory_exists "$SONARR_ROOT_DIR" "Sonarr" || return 1
-    
-    echo -n "Configuring root directory for Sonarr..."
-    
-    # Get existing root directories
-    existing_dirs=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/rootfolder")
-    
-    # Check if the default root directory already exists
-    if echo "$existing_dirs" | jq -e ".[] | select(.path == \"${SONARR_ROOT_DIR}\")" > /dev/null 2>&1; then
-        echo -e " ${YELLOW}Already configured${NC}"
-        return 0
-    fi
-    
-    # Add the root directory
-    response=$(curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -H "X-Api-Key: $SONARR_API_KEY" \
-        -d "{\"path\": \"${SONARR_ROOT_DIR}\"}" \
-        "$SONARR_URL/api/v3/rootfolder")
-    
-    if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
-        echo -e " ${GREEN}✓${NC}"
-        return 0
-    else
-        echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Error response: $response${NC}"
-        return 1
-    fi
-}
+# Function to enable rename settings on fresh install for an arr service
+configure_rename() {
+    local service_name=$1
+    local service_url=$2
+    local api_key=$3
+    local marker_file=$4
+    local setting=$5
+    local item_name=$6
 
-# Function to enable rename settings on fresh install for Radarr
-configure_rename_radarr() {
-    local marker_file="/config/radarr/rename_activated"
+    local service_name_lower=${service_name,,}
     
     # Check if rename has already been configured
     if [ -f "$marker_file" ]; then
-        echo -e "Radarr rename setting: ${YELLOW}Already configured (preserving user preference)${NC}"
+        echo -e "${service_name} rename setting: ${YELLOW}Already configured (preserving user preference)${NC}"
         return 0
     fi
     
-    echo -n "Enabling movie rename for Radarr (fresh install)..."
+    echo -n "Enabling ${item_name} rename for ${service_name} (fresh install)..."
     
     # Get current naming config
-    naming_config=$(curl -s -H "X-Api-Key: $RADARR_API_KEY" "$RADARR_URL/api/v3/config/naming")
+    naming_config=$(curl -s -H "X-Api-Key: $api_key" "$service_url/api/v3/config/naming")
     
     # Extract the ID from the config
     config_id=$(echo "$naming_config" | jq -r '.id')
@@ -405,68 +356,23 @@ configure_rename_radarr() {
         return 0
     fi
     
-    # Update naming config to enable RenameMovies
-    updated_config=$(echo "$naming_config" | jq '.renameMovies = true')
+    # Update naming config to enable the service's rename setting
+    updated_config=$(echo "$naming_config" | jq --arg setting "$setting" '.[$setting] = true')
     
     response=$(curl -s -X PUT \
         -H "Content-Type: application/json" \
-        -H "X-Api-Key: $RADARR_API_KEY" \
+        -H "X-Api-Key: $api_key" \
         -d "$updated_config" \
-        "$RADARR_URL/api/v3/config/naming/$config_id")
+        "$service_url/api/v3/config/naming/$config_id")
     
-    if echo "$response" | jq -e '.renameMovies' > /dev/null 2>&1; then
+    if echo "$response" | jq -e --arg setting "$setting" '.[$setting]' > /dev/null 2>&1; then
         # Create marker file to indicate rename has been configured
         touch "$marker_file"
         echo -e " ${GREEN}✓${NC}"
         return 0
     else
         echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Warning: Failed to enable rename${NC}"
-        return 0  # Don't fail the script, just warn
-    fi
-}
-
-# Function to enable rename settings on fresh install for Sonarr
-configure_rename_sonarr() {
-    local marker_file="/config/sonarr/rename_activated"
-    
-    # Check if rename has already been configured
-    if [ -f "$marker_file" ]; then
-        echo -e "Sonarr rename setting: ${YELLOW}Already configured (preserving user preference)${NC}"
-        return 0
-    fi
-    
-    echo -n "Enabling episode rename for Sonarr (fresh install)..."
-    
-    # Get current naming config
-    naming_config=$(curl -s -H "X-Api-Key: $SONARR_API_KEY" "$SONARR_URL/api/v3/config/naming")
-    
-    # Extract the ID from the config
-    config_id=$(echo "$naming_config" | jq -r '.id')
-    
-    if [ -z "$config_id" ] || [ "$config_id" = "null" ]; then
-        echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Warning: Failed to get naming config ID${NC}"
-        return 0
-    fi
-    
-    # Update naming config to enable RenameEpisodes
-    updated_config=$(echo "$naming_config" | jq '.renameEpisodes = true')
-    
-    response=$(curl -s -X PUT \
-        -H "Content-Type: application/json" \
-        -H "X-Api-Key: $SONARR_API_KEY" \
-        -d "$updated_config" \
-        "$SONARR_URL/api/v3/config/naming/$config_id")
-    
-    if echo "$response" | jq -e '.renameEpisodes' > /dev/null 2>&1; then
-        # Create marker file to indicate rename has been configured
-        touch "$marker_file"
-        echo -e " ${GREEN}✓${NC}"
-        return 0
-    else
-        echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Warning: Failed to enable rename${NC}"
+        echo -e "${RED}Warning: Failed to enable rename for ${service_name_lower}${NC}"
         return 0  # Don't fail the script, just warn
     fi
 }
@@ -498,22 +404,22 @@ echo ""
 echo "Configuring download clients..."
 
 # Add download clients
-add_downloadclient_to_radarr || exit 1
-add_downloadclient_to_sonarr || exit 1
+add_downloadclient "Radarr" "$RADARR_URL" "$RADARR_API_KEY" "$TORRENT_CATEGORY_MOVIES" "movieCategory" || exit 1
+add_downloadclient "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "$TORRENT_CATEGORY_TV" "tvCategory" || exit 1
 
 echo ""
 echo "Configuring root directories..."
 
 # Configure root directories
-configure_root_directory_radarr || exit 1
-configure_root_directory_sonarr || exit 1
+configure_root_directory "Radarr" "$RADARR_URL" "$RADARR_API_KEY" "$RADARR_ROOT_DIR" || exit 1
+configure_root_directory "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "$SONARR_ROOT_DIR" || exit 1
 
 echo ""
 echo "Configuring rename settings (fresh install only)..."
 
 # Configure rename settings
-configure_rename_radarr
-configure_rename_sonarr
+configure_rename "Radarr" "$RADARR_URL" "$RADARR_API_KEY" "/config/radarr/rename_activated" "renameMovies" "movie"
+configure_rename "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "/config/sonarr/rename_activated" "renameEpisodes" "episode"
 
 echo ""
 echo -e "${GREEN}==========================================="
