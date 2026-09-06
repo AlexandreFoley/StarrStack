@@ -10,7 +10,7 @@ inputs.
 From the repository root, run:
 
 ```bash
-python3 scripts/update-api-docs.py
+python3 arrAPI/update-api-docs.py
 ```
 
 The script downloads the current OpenAPI documents from the Radarr and Sonarr
