@@ -74,91 +74,48 @@ wait_for_service() {
     return 1
 }
 
-# Function to add Radarr application in Prowlarr
-add_radarr_to_prowlarr() {
-    echo -n "Adding Radarr-autoconf to Prowlarr..."
-    
-    # Check if Radarr application already exists
-    existing=$(curl -s -H "X-Api-Key: $PROWLARR_API_KEY" "$PROWLARR_URL/api/v1/applications" | \
-               jq -r '.[] | select(.name == "Radarr-autoconf") | .id')
-    
-    if [ -n "$existing" ]; then
-        echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
-        return 0
-    fi
-    
-    # Add Radarr application
-    response=$(curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -H "X-Api-Key: $PROWLARR_API_KEY" \
-        -d '{
-            "name": "Radarr-autoconf",
-            "syncLevel": "fullSync",
-            "implementation": "Radarr",
-            "configContract": "RadarrSettings",
-            "tags": [],
-            "fields": [
-                {
-                    "name": "baseUrl",
-                    "value": "'"$RADARR_URL"'"
-                },
-                {
-                    "name": "apiKey",
-                    "value": "'"$RADARR_API_KEY"'"
-                },
-                {
-                    "name": "syncCategories",
-                    "value": [2000, 2010, 2020, 2030, 2040, 2045, 2050, 2060, 2070, 2080]
-                }
-            ]
-        }' \
-        "$PROWLARR_URL/api/v1/applications")
-    
-    if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
-        echo -e " ${GREEN}✓${NC}"
-        return 0
-    else
-        echo -e " ${RED}✗${NC}"
-        echo -e "${RED}Error response: $response${NC}"
-        return 1
-    fi
-}
+# Function to add an arr application in Prowlarr
+add_app_to_prowlarr() {
+    local app_name=$1
+    local app_url=$2
+    local app_api_key=$3
+    local implementation=$4
+    local sync_categories=$5
+    local autoconf_name="${app_name}-autoconf"
 
-# Function to add Sonarr application in Prowlarr
-add_sonarr_to_prowlarr() {
-    echo -n "Adding Sonarr-autoconf to Prowlarr..."
+    echo -n "Adding ${autoconf_name} to Prowlarr..."
     
-    # Check if Sonarr application already exists
+    # Check if the application already exists
     existing=$(curl -s -H "X-Api-Key: $PROWLARR_API_KEY" "$PROWLARR_URL/api/v1/applications" | \
-               jq -r '.[] | select(.name == "Sonarr-autoconf") | .id')
+               jq -r ".[] | select(.name == \"${autoconf_name}\") | .id")
     
     if [ -n "$existing" ]; then
         echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
         return 0
     fi
     
-    # Add Sonarr application
+    # Add the application
     response=$(curl -s -X POST \
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $PROWLARR_API_KEY" \
         -d '{
-            "name": "Sonarr-autoconf",
+            "name": "'"$autoconf_name"'",
             "syncLevel": "fullSync",
-            "implementation": "Sonarr",
-            "configContract": "SonarrSettings",
+            "implementation": "'"$implementation"'",
+            "configContract": "'"${implementation}Settings"'",
             "tags": [],
             "fields": [
                 {
                     "name": "baseUrl",
-                    "value": "'"$SONARR_URL"'"
+                    "value": "'"$app_url"'"
                 },
                 {
                     "name": "apiKey",
-                    "value": "'"$SONARR_API_KEY"'"
+                    "value": "'"$app_api_key"'"
                 },
                 {
                     "name": "syncCategories",
-                    "value": [5000, 5010, 5020, 5030, 5040, 5045, 5050, 5060, 5070, 5080]
+                    "value": '"$sync_categories"'
                 }
             ]
         }' \
@@ -209,8 +166,10 @@ echo ""
 echo "Configuring indexer providers..."
 
 # Add applications to Prowlarr
-add_radarr_to_prowlarr || exit 1
-add_sonarr_to_prowlarr || exit 1
+add_app_to_prowlarr "Radarr" "$RADARR_URL" "$RADARR_API_KEY" "Radarr" \
+    "[2000, 2010, 2020, 2030, 2040, 2045, 2050, 2060, 2070, 2080]" || exit 1
+add_app_to_prowlarr "Sonarr" "$SONARR_URL" "$SONARR_API_KEY" "Sonarr" \
+    "[5000, 5010, 5020, 5030, 5040, 5045, 5050, 5060, 5070, 5080]" || exit 1
 
 # Trigger sync
 echo ""

@@ -63,7 +63,7 @@ jobs:
               - 'config/unpackerr.conf'
             tests:
               - 'tests/**'
-              - 'Makefile'
+              - 'Justfile'
               - 'requirements-test.txt'
               - '.github/workflows/test.yml'
 
@@ -172,7 +172,7 @@ jobs:
       - name: Install Podman
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          sudo apt-get install -y just podman fuse-overlayfs slirp4netns ca-certificates
           podman version
 
       - name: Load BuildKit image into Podman
@@ -182,7 +182,7 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Run the suite for ${{ env.VARIANT }}
-        run: make test-${{ env.VARIANT }}
+        run: just test-${{ env.VARIANT }}
 
   test-alpine:
     needs: changes
@@ -269,7 +269,7 @@ jobs:
       - name: Install Podman
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman fuse-overlayfs slirp4netns ca-certificates
+          sudo apt-get install -y just podman fuse-overlayfs slirp4netns ca-certificates
           podman version
 
       - name: Load BuildKit image into Podman
@@ -279,4 +279,4 @@ jobs:
         run: pip install -r requirements-test.txt
 
       - name: Run the suite for ${{ env.VARIANT }}
-        run: make test-${{ env.VARIANT }}
+        run: just test-${{ env.VARIANT }}

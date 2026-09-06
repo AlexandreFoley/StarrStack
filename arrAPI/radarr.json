@@ -8952,7 +8952,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": { }
+              "additionalProperties": {}
             },
             "nullable": true
           }
@@ -12834,10 +12834,12 @@
   },
   "security": [
     {
-      "X-Api-Key": [ ]
+      "X-Api-Key": []
     },
     {
-      "apikey": [ ]
+      "apikey": []
     }
-  ]
+  ],
+  "x-source-url": "https://raw.githubusercontent.com/Radarr/Radarr/develop/src/Radarr.Api.V3/openapi.json",
+  "x-downloaded-at": "2026-09-06T14:30:31+00:00"
 }

@@ -26,3 +26,33 @@ Alternative basé sur Alpine pour *arr:
         - https://stackoverflow.com/questions/78269734/is-there-a-better-way-to-run-openrc-in-a-container-than-enabling-softlevel
         - dépendence sur setfacl pour gérer les permissions des services sut les dossiers dans config. problème?
 
+## Roadmap
+
+- Add optional support for Lidarr, Readarr, and Whisparr to the image and
+  service configuration.
+- Keep their existing installer branches until each service has a complete
+  container integration: version/build arguments, service definition, image
+  wiring, configuration, and tests.
+
+## Updating the Unpackerr repository script
+
+`scripts/repo.sh` is maintained upstream by GoLift and is copied from
+`https://golift.io/repo.sh`. Keep the upstream script intact instead of
+removing support for platforms that this image does not currently use.
+
+When refreshing it:
+
+1. Download the upstream script to a temporary file with `curl --fail
+   --location --silent --show-error`.
+2. Review the diff, especially repository URLs, signing-key handling, package
+   installation commands, and shell compatibility.
+3. Replace `scripts/repo.sh` only after confirming the script still supports
+   the UBI/YUM path used for Unpackerr.
+4. Run `bash -n scripts/repo.sh`, build the UBI image, and run `just test`.
+5. Commit the upstream refresh separately, recording the source URL and
+   retrieval date in the commit message.
+
+The long-term improvement is a scheduled update check that downloads the
+upstream copy, opens or reports a reviewable diff, and never replaces the
+checked-in script automatically.
+
