@@ -1,4 +1,4 @@
-.PHONY: venv test test-ubi test-alpine test-static test-quadlet clean
+set shell := ["bash", "-c"]
 
 venv:
 	@if [ ! -d ".venv" ]; then \
@@ -8,12 +8,11 @@ venv:
 		echo "Venv already exists"; \
 	fi
 
-# Default: the whole suite against BOTH images in one session (each variant
-# uses its own host port range, see tests/conftest.py).
+# Default: the whole suite against both images in one session.
 test: venv
 	.venv/bin/pytest tests/ -v -ra -s
 
-# Single-variant runs (faster, and useful per-variant in CI).
+# Single-variant runs are faster and useful in CI.
 test-ubi: venv
 	VARIANT=ubi .venv/bin/pytest tests/ -v -ra -s
 

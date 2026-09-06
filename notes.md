@@ -48,7 +48,7 @@ When refreshing it:
    installation commands, and shell compatibility.
 3. Replace `scripts/repo.sh` only after confirming the script still supports
    the UBI/YUM path used for Unpackerr.
-4. Run `bash -n scripts/repo.sh`, build the UBI image, and run `make test`.
+4. Run `bash -n scripts/repo.sh`, build the UBI image, and run `just test`.
 5. Commit the upstream refresh separately, recording the source URL and
    retrieval date in the commit message.
 
