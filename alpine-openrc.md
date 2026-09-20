@@ -27,7 +27,6 @@ Goal: an Alpine-based variant of the ubi9-init image (`ubi.dockerfile`) that
 | `getent` (used by `arrstack-install.sh`) | 10-line shim | Alpine busybox (main + extras) has no `getent` applet |
 | package manager (used by `arrstack-install.sh`) | `dnf` → `apk` shim | the only dnf calls are `dnf update -y` and `dnf install -y --skip-broken PKGS` |
 | Daemon restart | `supervisor=supervise-daemon`, `respawn_max=0` (unlimited), `respawn_delay=2` | ubi `Restart=on-failure` parity |
-| OpenRC cgroups | `rc_cgroup_mode="none"` | Docker exposes a read-only cgroup v2 mount; OpenRC otherwise attempts one `openrc.<service>` directory per service |
 
 ## Verified facts (source)
 

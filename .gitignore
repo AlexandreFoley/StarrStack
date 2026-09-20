@@ -29,4 +29,3 @@ Thumbs.db
 *.pyc
 .venv
 test_api_key
-tests/lima/results/
