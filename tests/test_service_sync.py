@@ -142,7 +142,7 @@ def test_unpackerr_env_segregation():
     assert "[!A-Za-z0-9_]" in cinit, "harvest lost the key-name guard"
 
     # no global passthrough configured, no stale drop-in dir in the alpine image
-    assert ">> /etc/rc.conf" not in dockerfile
+    assert "rc_env_allow=" not in dockerfile
     assert "unpackerr.service.d" not in dockerfile
 
 

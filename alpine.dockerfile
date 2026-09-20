@@ -104,11 +104,13 @@ LABEL org.opencontainers.image.title="Starr Stack" \
 # src/shared/misc.c); the runtime env (API keys etc.) reaches each service
 # per-service via /etc/conf.d/<service> files written by container-init.sh's
 # harvest — no rc_env_allow needed (and no cross-service leakage).
+# Docker supplies a read-only cgroup v2 mount; this image has no limits.
 RUN apk add --no-cache openrc busybox-openrc bash curl jq icu-libs sqlite-libs runuser ca-certificates && \
     for u in radarr sonarr prowlarr unpackerr; do \
         addgroup -S "$u" && adduser -S -H -G "$u" "$u"; \
     done && \
-    mkdir -p /run/openrc
+    mkdir -p /run/openrc && \
+    printf '%s\n' 'rc_cgroup_mode="none"' >> /etc/rc.conf
 
 # Copy consolidated applications from consolidator stage
 COPY --from=consolidator /opt /opt
