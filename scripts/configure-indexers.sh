@@ -74,7 +74,12 @@ wait_for_service() {
     return 1
 }
 
-# Function to add an arr application in Prowlarr
+# Function to add an arr application in Prowlarr, or refresh it when it
+# already exists. The "<App>-autoconf" entry is owned by this container: the
+# API keys are supplied externally, so a rotated key (or a changed URL base)
+# must not leave Prowlarr talking to the app with stale credentials. The
+# connection fields are overwritten on every startup; the rest of the entry
+# (tags, sync level, ...) is preserved.
 add_app_to_prowlarr() {
     local app_name=$1
     local app_url=$2
@@ -82,45 +87,46 @@ add_app_to_prowlarr() {
     local implementation=$4
     local sync_categories=$5
     local autoconf_name="${app_name}-autoconf"
+    local existing existing_id payload method endpoint response
 
-    echo -n "Adding ${autoconf_name} to Prowlarr..."
-    
-    # Check if the application already exists
     existing=$(curl -s -H "X-Api-Key: $PROWLARR_API_KEY" "$PROWLARR_URL/api/v1/applications" | \
-               jq -r ".[] | select(.name == \"${autoconf_name}\") | .id")
-    
+               jq -c "first(.[] | select(.name == \"${autoconf_name}\")) // empty")
+
     if [ -n "$existing" ]; then
-        echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
-        return 0
+        existing_id=$(printf '%s' "$existing" | jq -r '.id')
+        echo -n "Refreshing ${autoconf_name} in Prowlarr..."
+        # Round-trip the resource Prowlarr returned and overwrite only the
+        # fields this container owns, so user-set values survive.
+        payload=$(printf '%s' "$existing" | jq -c \
+            --arg url "$app_url" --arg key "$app_api_key" \
+            '.fields |= map(if .name == "baseUrl" then .value = $url
+                            elif .name == "apiKey" then .value = $key
+                            else . end)')
+        method=PUT
+        endpoint="${PROWLARR_URL}/api/v1/applications/${existing_id}"
+    else
+        echo -n "Adding ${autoconf_name} to Prowlarr..."
+        payload=$(jq -c -n \
+            --arg name "$autoconf_name" \
+            --arg implementation "$implementation" \
+            --arg url "$app_url" \
+            --arg key "$app_api_key" \
+            --argjson sync_categories "$sync_categories" \
+            '{name: $name, syncLevel: "fullSync", implementation: $implementation,
+              configContract: ($implementation + "Settings"), tags: [],
+              fields: [{name: "baseUrl", value: $url},
+                       {name: "apiKey", value: $key},
+                       {name: "syncCategories", value: $sync_categories}]}')
+        method=POST
+        endpoint="${PROWLARR_URL}/api/v1/applications"
     fi
-    
-    # Add the application
-    response=$(curl -s -X POST \
+
+    response=$(curl -s -X "$method" \
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $PROWLARR_API_KEY" \
-        -d '{
-            "name": "'"$autoconf_name"'",
-            "syncLevel": "fullSync",
-            "implementation": "'"$implementation"'",
-            "configContract": "'"${implementation}Settings"'",
-            "tags": [],
-            "fields": [
-                {
-                    "name": "baseUrl",
-                    "value": "'"$app_url"'"
-                },
-                {
-                    "name": "apiKey",
-                    "value": "'"$app_api_key"'"
-                },
-                {
-                    "name": "syncCategories",
-                    "value": '"$sync_categories"'
-                }
-            ]
-        }' \
-        "$PROWLARR_URL/api/v1/applications")
-    
+        -d "$payload" \
+        "$endpoint")
+
     if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
         echo -e " ${GREEN}✓${NC}"
         return 0

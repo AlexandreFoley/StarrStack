@@ -89,6 +89,15 @@ wait_for_service() {
     return 1
 }
 
+# Transmission is served under /transmission/; the other clients sit at the
+# root. Single source of truth for the URL base (payload and refresh).
+client_url_base() {
+    case "${1,,}" in
+        transmission) printf '%s' "/transmission/" ;;
+        *)            printf '%s' "" ;;
+    esac
+}
+
 # Function to get download client config
 get_client_config() {
     local client_type=$1
@@ -97,7 +106,8 @@ get_client_config() {
     local client_name="${client_type^}"
     
     # Client-specific configurations
-    local url_base=""
+    local url_base
+    url_base="$(client_url_base "$client_type")"
     local extra_fields=""
     
     case "${client_type,,}" in
@@ -127,7 +137,6 @@ EXTRA
 )
             ;;
         transmission)
-            url_base="/transmission/"
             extra_fields=$(cat <<'EXTRA'
         {
             "name": "recentMoviePriority",
@@ -219,7 +228,12 @@ ${extra_fields}
 EOF
 }
 
-# Function to add a download client to an arr service
+# Function to add a download client to an arr service, or refresh it when it
+# already exists. The "<Client>-autoconf" entry is owned by this container: the
+# torrent host and credentials are supplied externally, so changed values
+# (password rotation, new host/port, category) must replace the stored ones.
+# The connection fields are overwritten on every startup; the rest of the
+# entry (priorities, ...) is preserved.
 add_downloadclient() {
     local service_name=$1
     local service_url=$2
@@ -227,27 +241,51 @@ add_downloadclient() {
     local category=$4
     local category_field=$5
     local client_name="${TORRENT_CLIENT^}-autoconf"
-    echo -n "Adding ${client_name} to ${service_name}..."
-    
-    # Check if download client already exists by name
+    local existing existing_id payload method endpoint response
+
     existing=$(curl -s -H "X-Api-Key: $api_key" "$service_url/api/v3/downloadclient" | \
-               jq -r ".[] | select(.name == \"${client_name}\") | .id")
-    
+               jq -c "first(.[] | select(.name == \"${client_name}\")) // empty")
+
     if [ -n "$existing" ]; then
-        echo -e " ${YELLOW}Already configured (ID: $existing)${NC}"
-        return 0
+        existing_id=$(printf '%s' "$existing" | jq -r '.id')
+        echo -n "Refreshing ${client_name} in ${service_name}..."
+        # Round-trip the resource Radarr/Sonarr returned and overwrite only
+        # the fields this container owns, so user-set values survive.
+        # forceSave: the update would otherwise test the connection, and the
+        # torrent client may not be up yet while the stack starts.
+        payload=$(printf '%s' "$existing" | jq -c \
+            --arg host "$TORRENT_HOST" \
+            --argjson port "$TORRENT_PORT" \
+            --argjson use_ssl "$TORRENT_USE_SSL" \
+            --arg url_base "$(client_url_base "$TORRENT_CLIENT")" \
+            --arg username "$TORRENT_USERNAME" \
+            --arg password "$TORRENT_PASSWORD" \
+            --arg category "$category" \
+            --arg category_field "$category_field" \
+            '.fields |= map(
+                if .name == "host" then .value = $host
+                elif .name == "port" then .value = $port
+                elif .name == "useSsl" then .value = $use_ssl
+                elif .name == "urlBase" then .value = $url_base
+                elif .name == "username" then .value = $username
+                elif .name == "password" then .value = $password
+                elif .name == $category_field then .value = $category
+                else . end)')
+        method=PUT
+        endpoint="$service_url/api/v3/downloadclient/$existing_id?forceSave=true"
+    else
+        echo -n "Adding ${client_name} to ${service_name}..."
+        payload=$(get_client_config "${TORRENT_CLIENT,,}" "$category" "$category_field")
+        method=POST
+        endpoint="$service_url/api/v3/downloadclient"
     fi
-    
-    # Get config
-    config=$(get_client_config "${TORRENT_CLIENT,,}" "$category" "$category_field")
-    
-    # Add download client
-    response=$(curl -s -X POST \
+
+    response=$(curl -s -X "$method" \
         -H "Content-Type: application/json" \
         -H "X-Api-Key: $api_key" \
-        -d "$config" \
-        "$service_url/api/v3/downloadclient")
-    
+        -d "$payload" \
+        "$endpoint")
+
     if echo "$response" | jq -e '.id' > /dev/null 2>&1; then
         echo -e " ${GREEN}✓${NC}"
         return 0
