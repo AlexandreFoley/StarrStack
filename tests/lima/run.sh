@@ -79,6 +79,7 @@ up() {
     lima docker volume create starr-openrc-media >/dev/null
     lima docker run -d --name "$CONTAINER" --restart=no \
         -p 7878:7878 -p 8989:8989 -p 9696:9696 \
+        --tmpfs /run \
         -v starr-openrc-config:/config -v starr-openrc-media:/media \
         -e RADARR__AUTH__ENABLED=false \
         -e SONARR__AUTH__ENABLED=false \

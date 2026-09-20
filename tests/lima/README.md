@@ -24,6 +24,8 @@ available inside the VM. `reset` is the destructive operation: it removes the
 VM and the captured results, but does not touch any other Lima VM.
 
 The container has authentication disabled and no torrent client configured.
+The test also supplies `/run` as a container tmpfs, matching the deployment
+setting needed by OpenRC's sysinit.
 For the cgroup failure, inspect `docker-info.txt`, `vm-cgroup.txt`,
 `container-inspect.txt`, `container-cgroup.txt`, `container-mounts.txt`, and
 `container-logs.txt`.
