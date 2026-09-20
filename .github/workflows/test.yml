@@ -280,3 +280,37 @@ jobs:
 
       - name: Run the suite for ${{ env.VARIANT }}
         run: just test-${{ env.VARIANT }}
+
+  test-openrc-docker:
+    needs: changes
+    if: >-
+      !cancelled() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+       needs.changes.outputs.tests == 'true' || needs.changes.outputs.alpine == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      REPRODUCER_RUNTIME: docker
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Run OpenRC Docker reproducer
+        run: tests/lima/run.sh up
+
+      - name: Stop container and collect diagnostics
+        if: always()
+        run: tests/lima/run.sh down || true
+
+      - name: Upload reproducer diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: openrc-docker-results
+          path: tests/lima/results/
+          if-no-files-found: ignore
+
+      - name: Reset reproducer container
+        if: always()
+        run: tests/lima/run.sh reset || true
